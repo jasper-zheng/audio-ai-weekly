@@ -23,7 +23,13 @@ from typing import Any, Callable, Mapping
 import yaml
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
-from model_utils import build_chat_kwargs, create_client, get_ai_config
+from languages import LANGUAGE_NAMES, feature_budget, field
+from model_utils import (
+    RequestLimitExceeded,
+    build_chat_kwargs,
+    create_client,
+    get_ai_config,
+)
 
 
 ROOT = Path(__file__).parent.parent
@@ -45,6 +51,8 @@ PROMPTS = {
         "grounding_patch_en",
         "translate_ja_metadata",
         "translate_ja_blocks",
+        "translate_zh_metadata",
+        "translate_zh_blocks",
         "verify_translation",
     )
 }
@@ -55,7 +63,11 @@ IDENTIFIER_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SEARCH_TERM_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .+/_-]{1,79}$")
 SOURCE_ID_RE = re.compile(r"^S[1-9][0-9]*$")
 ARXIV_VERSION_RE = re.compile(r"v[0-9]+$")
-JAPANESE_CHAR_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff]")
+# Kana is the only reliable discriminator between Japanese and Chinese: Han
+# ideographs are shared, so a Han-only regex scores Chinese text as Japanese.
+KANA_RE = re.compile(r"[\u3040-\u30ff]")
+HAN_RE = re.compile(r"[\u3400-\u9fff]")
+CJK_CHAR_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff]")
 LATIN_CHAR_RE = re.compile(r"[A-Za-z]")
 ENGLISH_WORD_RE = re.compile(r"\b[A-Za-z][A-Za-z'-]*\b")
 TRUNCATED_FINISH_REASONS = frozenset({"length", "max_tokens", "max_output_tokens"})
@@ -749,6 +761,12 @@ def _retryable_model_error(exc: Exception) -> bool:
 
 def _provider_fallback_error(exc: Exception) -> bool:
     """Return whether another configured provider may handle this failure."""
+    if isinstance(exc, RequestLimitExceeded):
+        # The run budget is a spend cap, not a provider outage. It reports
+        # status_code 429, which would otherwise look like rate limiting and
+        # silently divert the run to a fallback provider whose smaller
+        # feature_max_tokens cannot grow the truncation-retry ladder. Fail closed.
+        return False
     if isinstance(exc, (APIConnectionError, APITimeoutError)):
         return True
     status_code = getattr(exc, "status_code", None)
@@ -1075,7 +1093,7 @@ def choose_topic(
     raise FeatureError("AI topic selection validation loop exited unexpectedly")
 
 
-def _body_texts(feature: Mapping[str, Any]) -> list[str]:
+def _body_texts(feature: Mapping[str, Any], field: str = "text") -> list[str]:
     sections = feature.get("sections", [])
     if not isinstance(sections, list):
         return []
@@ -1087,20 +1105,34 @@ def _body_texts(feature: Mapping[str, Any]) -> list[str]:
         if not isinstance(blocks, list):
             continue
         for block in blocks:
-            if isinstance(block, dict) and isinstance(block.get("text"), str):
-                texts.append(block["text"])
+            if isinstance(block, dict) and isinstance(block.get(field), str):
+                texts.append(block[field])
     return texts
 
 
-def article_character_count(feature: Mapping[str, Any]) -> int:
-    text = "".join(_body_texts(feature))
+def article_character_count(feature: Mapping[str, Any], field: str = "text") -> int:
+    text = "".join(_body_texts(feature, field))
     return len("".join(text.split()))
 
 
-def _japanese_ratio(value: str) -> float:
-    japanese = len(JAPANESE_CHAR_RE.findall(value))
+def _cjk_ratio(value: str) -> float:
+    """Return the share of CJK characters against CJK plus Latin characters."""
+    cjk = len(CJK_CHAR_RE.findall(value))
     latin = len(LATIN_CHAR_RE.findall(value))
-    return japanese / max(1, japanese + latin)
+    return cjk / max(1, cjk + latin)
+
+
+def _kana_ratio(value: str) -> float:
+    """Return the share of kana among CJK characters.
+
+    Japanese prose runs 40-55% kana; Chinese uses none. A ratio rather than a
+    presence test keeps a stray "・" or "ー" in an otherwise Chinese block from
+    failing validation and burning a retry attempt.
+    """
+    cjk = len(CJK_CHAR_RE.findall(value))
+    if not cjk:
+        return 0.0
+    return len(KANA_RE.findall(value)) / cjk
 
 
 def _valid_source_ids(value: Any, known_ids: set[str]) -> bool:
@@ -1126,7 +1158,7 @@ def _predominantly_english(value: Any) -> bool:
         isinstance(value, str)
         and bool(value.strip())
         and bool(LATIN_CHAR_RE.search(value))
-        and _japanese_ratio(value) <= 0.1
+        and _cjk_ratio(value) <= 0.1
     )
 
 
@@ -1134,9 +1166,50 @@ def _predominantly_japanese(value: Any, cfg: Mapping[str, Any]) -> bool:
     return (
         isinstance(value, str)
         and bool(value.strip())
-        and bool(JAPANESE_CHAR_RE.search(value))
-        and _japanese_ratio(value) >= cfg["japanese_metadata_min_ratio"]
+        and bool(CJK_CHAR_RE.search(value))
+        and _cjk_ratio(value) >= cfg["japanese_metadata_min_ratio"]
     )
+
+
+def _predominantly_chinese(value: Any, cfg: Mapping[str, Any]) -> bool:
+    """Accept Chinese metadata and reject a Japanese translation in its place.
+
+    Deliberately asymmetric with _predominantly_japanese: kana absence is a
+    zero-false-positive signal for Chinese, whereas requiring kana for Japanese
+    would reject legitimate kana-free kanji compounds.
+    """
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and bool(HAN_RE.search(value))
+        and _cjk_ratio(value) >= cfg["chinese_metadata_min_ratio"]
+        and _kana_ratio(value) <= cfg["chinese_kana_max_ratio"]
+    )
+
+
+def _lang_cfg(cfg: Mapping[str, Any], language: str) -> dict:
+    """Return a normalized-key budget dict for one translation target language."""
+    try:
+        return feature_budget(cfg, language)
+    except KeyError as exc:
+        raise FeatureError(
+            f"No feature budget configured for language {language!r}"
+        ) from exc
+
+
+def translation_target_languages(cfg: Mapping[str, Any] = FEATURE_SETTINGS) -> list[str]:
+    """Return the languages translated from the canonical English edition."""
+    configured = cfg.get("translation_target_languages") or ["ja"]
+    return [language for language in configured if isinstance(language, str)]
+
+
+def _predominantly(value: Any, language: str, cfg: Mapping[str, Any]) -> bool:
+    """Dispatch the per-language script check for a metadata string."""
+    if language == "en":
+        return _predominantly_english(value)
+    if language == "zh":
+        return _predominantly_chinese(value, cfg)
+    return _predominantly_japanese(value, cfg)
 
 
 def validate_english_body(
@@ -1294,6 +1367,89 @@ def validate_english_body(
         raise FeatureValidationError(errors)
 
 
+def _translated_edition_errors(
+    feature: Mapping[str, Any], language: str, cfg: Mapping[str, Any]
+) -> list[str]:
+    """Gate one translated edition's length, script density and reading time.
+
+    Applied identically to every target language so a new language cannot inherit
+    a weaker gate than Japanese.
+    """
+    lcfg = _lang_cfg(cfg, language)
+    name = lcfg["language_name"]
+    errors: list[str] = []
+    text_field = field("text", language)
+    char_count = article_character_count(feature, text_field)
+    if not lcfg["validation_min_chars"] <= char_count <= lcfg["validation_max_chars"]:
+        errors.append(
+            f"{name} body has {char_count} characters; allowed tolerance is "
+            f"{lcfg['validation_min_chars']}-{lcfg['validation_max_chars']}"
+        )
+    body_text = "".join(_body_texts(feature, text_field))
+    if _cjk_ratio(body_text) < lcfg["body_min_ratio"]:
+        errors.append(
+            f"{name} body language ratio is below {lcfg['body_min_ratio']:.0%}"
+        )
+    kana_max = lcfg.get("kana_max_ratio")
+    if kana_max is not None and body_text and _kana_ratio(body_text) > kana_max:
+        errors.append(f"{name} body must not contain Japanese kana")
+    read_time_field = field("readTimeMinutes", language)
+    expected_read_time = max(
+        1, math.ceil(char_count / lcfg["reading_chars_per_minute"])
+    )
+    if feature.get(read_time_field) != expected_read_time:
+        errors.append(f"{read_time_field} must be {expected_read_time}")
+    if (
+        not cfg["reading_minutes_min"]
+        <= expected_read_time
+        <= cfg["reading_minutes_max"]
+    ):
+        errors.append(
+            f"Estimated {name} reading time must be {cfg['reading_minutes_min']}-"
+            f"{cfg['reading_minutes_max']} minutes"
+        )
+    return errors
+
+
+def _distinct_edition_errors(
+    feature: Mapping[str, Any], target_languages: list[str]
+) -> list[str]:
+    """Catch a mis-wired merge that copied one language into another's fields.
+
+    Only applied to long fields. Short headings and labels legitimately coincide
+    between Japanese and Chinese (展望, 限界), so comparing them would false-fire.
+    """
+    errors: list[str] = []
+    pairs = [
+        (first, second)
+        for index, first in enumerate(target_languages)
+        for second in target_languages[index + 1 :]
+    ]
+    sections = feature.get("sections")
+    sections = sections if isinstance(sections, list) else []
+    for first, second in pairs:
+        if feature.get(field("dek", first)) == feature.get(field("dek", second)):
+            errors.append(
+                f"dek is identical in {first} and {second}; the translations were "
+                "not merged correctly"
+            )
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            blocks = section.get("blocks")
+            for block in blocks if isinstance(blocks, list) else []:
+                if not isinstance(block, dict):
+                    continue
+                if block.get(field("text", first)) == block.get(
+                    field("text", second)
+                ):
+                    errors.append(
+                        f"Block {block.get('id')!r} is identical in {first} and "
+                        f"{second}; the translations were not merged correctly"
+                    )
+    return errors
+
+
 def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) -> None:
     """Apply deterministic publication gates to a complete feature payload."""
     errors: list[str] = []
@@ -1304,13 +1460,21 @@ def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) ->
         errors.append("schemaVersion must be 1")
     if feature.get("sourceLanguage") != "en":
         errors.append("sourceLanguage must be en")
-    translation = feature.get("translation")
-    if (
-        not isinstance(translation, dict)
-        or translation.get("targetLanguage") != "ja"
-        or translation.get("status") != "passed"
-    ):
-        errors.append("translation must be verifier-passed English-to-Japanese")
+    target_languages = translation_target_languages(cfg)
+    # Every edition rendered from this feature: the canonical English plus each
+    # verified translation.
+    editions = ["en", *target_languages]
+    translations = feature.get("translations")
+    if not isinstance(translations, dict):
+        errors.append("translations must be an object keyed by target language")
+    else:
+        for language in target_languages:
+            entry = translations.get(language)
+            if not isinstance(entry, dict) or entry.get("status") != "passed":
+                errors.append(
+                    f"translations.{language} must be a verifier-passed "
+                    f"English-to-{LANGUAGE_NAMES[language]} translation"
+                )
     if feature.get("type") not in ("primer", "debate"):
         errors.append("type must be primer or debate")
     try:
@@ -1320,15 +1484,19 @@ def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) ->
     slug = feature.get("slug")
     if not isinstance(slug, str) or not TOPIC_KEY_RE.fullmatch(slug):
         errors.append("slug must be lowercase kebab-case")
-    for field in ("topicKey", "title", "titleEn", "dek", "dekEn", "summaryEn"):
-        if not isinstance(feature.get(field), str) or not feature[field].strip():
-            errors.append(f"{field} must be a non-empty string")
-    for field in ("title", "dek"):
-        if not _predominantly_japanese(feature.get(field), cfg):
-            errors.append(f"{field} must be predominantly Japanese")
-    for field in ("titleEn", "dekEn"):
-        if not _predominantly_english(feature.get(field)):
-            errors.append(f"{field} must be predominantly English")
+    required_text = ["topicKey", "summaryEn"] + [
+        field(base, language) for base in ("title", "dek") for language in editions
+    ]
+    for key in required_text:
+        if not isinstance(feature.get(key), str) or not feature[key].strip():
+            errors.append(f"{key} must be a non-empty string")
+    for base in ("title", "dek"):
+        for language in editions:
+            key = field(base, language)
+            if not _predominantly(feature.get(key), language, cfg):
+                errors.append(
+                    f"{key} must be predominantly {LANGUAGE_NAMES[language]}"
+                )
     summary_en = feature.get("summaryEn")
     if isinstance(summary_en, str):
         summary_word_count = len(ENGLISH_WORD_RE.findall(summary_en))
@@ -1341,7 +1509,7 @@ def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) ->
                 f"summaryEn must contain {cfg['english_summary_min_words']}-"
                 f"{cfg['english_summary_max_words']} English words"
             )
-        if not LATIN_CHAR_RE.search(summary_en) or _japanese_ratio(summary_en) > 0.1:
+        if not LATIN_CHAR_RE.search(summary_en) or _cjk_ratio(summary_en) > 0.1:
             errors.append("summaryEn must be predominantly English")
     key_points = feature.get("keyPointsEn")
     if (
@@ -1352,7 +1520,7 @@ def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) ->
         errors.append("keyPointsEn must contain at least three non-empty strings")
     else:
         for point in key_points:
-            if not LATIN_CHAR_RE.search(point) or _japanese_ratio(point) > 0.1:
+            if not LATIN_CHAR_RE.search(point) or _cjk_ratio(point) > 0.1:
                 errors.append("Every keyPointsEn item must be predominantly English")
 
     sources = feature.get("sources")
@@ -1438,23 +1606,20 @@ def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) ->
                 errors.append("Each perspective must be an object")
                 continue
             perspective_ids.append(perspective.get("id"))
-            for field in ("id", "label", "description"):
+            for key in ("id", "label", "description"):
                 if (
-                    not isinstance(perspective.get(field), str)
-                    or not perspective[field].strip()
+                    not isinstance(perspective.get(key), str)
+                    or not perspective[key].strip()
                 ):
-                    errors.append(f"Perspective {field} must be a non-empty string")
-            for field in ("label", "description"):
-                value = perspective.get(field)
-                if not _predominantly_japanese(value, cfg):
-                    errors.append(
-                        f"Perspective {field} must be predominantly Japanese"
-                    )
-            for field in ("labelEn", "descriptionEn"):
-                if not _predominantly_english(perspective.get(field)):
-                    errors.append(
-                        f"Perspective {field} must be predominantly English"
-                    )
+                    errors.append(f"Perspective {key} must be a non-empty string")
+            for base in ("label", "description"):
+                for language in editions:
+                    key = field(base, language)
+                    if not _predominantly(perspective.get(key), language, cfg):
+                        errors.append(
+                            f"Perspective {key} must be predominantly "
+                            f"{LANGUAGE_NAMES[language]}"
+                        )
             if not _valid_source_ids(perspective.get("sourceIds"), known_source_ids):
                 errors.append(
                     f"Perspective {perspective.get('id')!r} has invalid sourceIds"
@@ -1478,19 +1643,16 @@ def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) ->
             section["id"]
         ):
             errors.append("Section IDs must be lowercase kebab-case")
-        if (
-            not isinstance(section.get("heading"), str)
-            or not section["heading"].strip()
-        ):
-            errors.append(f"Section {section.get('id')!r} needs a heading")
-        elif not _predominantly_japanese(section["heading"], cfg):
-            errors.append(
-                f"Section {section.get('id')!r} heading must be predominantly Japanese"
-            )
-        if not _predominantly_english(section.get("headingEn")):
-            errors.append(
-                f"Section {section.get('id')!r} headingEn must be predominantly English"
-            )
+        for language in editions:
+            key = field("heading", language)
+            value = section.get(key)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"Section {section.get('id')!r} needs a {key}")
+            elif not _predominantly(value, language, cfg):
+                errors.append(
+                    f"Section {section.get('id')!r} {key} must be predominantly "
+                    f"{LANGUAGE_NAMES[language]}"
+                )
         blocks = section.get("blocks")
         if not isinstance(blocks, list) or not blocks:
             errors.append(f"Section {section.get('id')!r} needs at least one block")
@@ -1504,16 +1666,22 @@ def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) ->
                 block["id"]
             ):
                 errors.append("Block IDs must be lowercase kebab-case")
-            if not isinstance(block.get("text"), str) or not block["text"].strip():
-                errors.append(f"Block {block.get('id')!r} needs Japanese text")
-            elif _japanese_ratio(block["text"]) < cfg["japanese_body_min_ratio"]:
-                errors.append(
-                    f"Block {block.get('id')!r} must be predominantly Japanese"
-                )
-            if not _predominantly_english(block.get("textEn")):
-                errors.append(
-                    f"Block {block.get('id')!r} textEn must be predominantly English"
-                )
+            for language in editions:
+                key = field("text", language)
+                value = block.get(key)
+                if not isinstance(value, str) or not value.strip():
+                    errors.append(f"Block {block.get('id')!r} needs {key}")
+                elif language == "en":
+                    if not _predominantly_english(value):
+                        errors.append(
+                            f"Block {block.get('id')!r} {key} must be "
+                            "predominantly English"
+                        )
+                elif not _valid_translated_block(value, _lang_cfg(cfg, language)):
+                    errors.append(
+                        f"Block {block.get('id')!r} {key} must be predominantly "
+                        f"{LANGUAGE_NAMES[language]}"
+                    )
             if not _valid_source_ids(block.get("sourceIds"), known_source_ids):
                 errors.append(
                     f"Block {block.get('id')!r} has invalid or empty sourceIds"
@@ -1539,30 +1707,9 @@ def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) ->
             f"Every source must be cited; unused: {', '.join(unused_sources)}"
         )
 
-    char_count = article_character_count(feature)
-    if not cfg["validation_min_chars"] <= char_count <= cfg["validation_max_chars"]:
-        errors.append(
-            f"Japanese body has {char_count} characters; allowed tolerance is "
-            f"{cfg['validation_min_chars']}-{cfg['validation_max_chars']}"
-        )
-    body_text = "".join(_body_texts(feature))
-    if _japanese_ratio(body_text) < cfg["japanese_body_min_ratio"]:
-        errors.append(
-            "Japanese body language ratio is below "
-            f"{cfg['japanese_body_min_ratio']:.0%}"
-        )
-    expected_read_time = max(1, math.ceil(char_count / cfg["reading_chars_per_minute"]))
-    if feature.get("readTimeMinutes") != expected_read_time:
-        errors.append(f"readTimeMinutes must be {expected_read_time}")
-    if (
-        not cfg["reading_minutes_min"]
-        <= expected_read_time
-        <= cfg["reading_minutes_max"]
-    ):
-        errors.append(
-            f"Estimated reading time must be {cfg['reading_minutes_min']}-"
-            f"{cfg['reading_minutes_max']} minutes"
-        )
+    for language in target_languages:
+        errors.extend(_translated_edition_errors(feature, language, cfg))
+    errors.extend(_distinct_edition_errors(feature, target_languages))
     english_body = {
         "title": feature.get("titleEn"),
         "dek": feature.get("dekEn"),
@@ -1622,13 +1769,15 @@ def validate_feature(feature: Any, cfg: Mapping[str, Any] = FEATURE_SETTINGS) ->
 BODY_FIELDS = (
     "title",
     "titleEn",
+    "titleZh",
     "dek",
     "dekEn",
+    "dekZh",
     "summaryEn",
     "keyPointsEn",
     "perspectives",
     "sections",
-    "translation",
+    "translations",
 )
 
 
@@ -1644,7 +1793,7 @@ def assemble_feature(
 ) -> dict:
     topic_key = plan["topicKey"]
     slug = f"{as_of.isoformat()}-{article_type}-{topic_key}"
-    feature = {field: body.get(field) for field in BODY_FIELDS}
+    feature = {name: body.get(name) for name in BODY_FIELDS}
     feature.update(
         {
             "schemaVersion": 1,
@@ -1658,10 +1807,14 @@ def assemble_feature(
             "sources": sources,
         }
     )
-    char_count = article_character_count(feature)
-    feature["readTimeMinutes"] = max(
-        1, math.ceil(char_count / cfg["reading_chars_per_minute"])
-    )
+    # Character-based reading time for every translated edition, word-based for
+    # the canonical English one.
+    for language in translation_target_languages(cfg):
+        lcfg = _lang_cfg(cfg, language)
+        char_count = article_character_count(feature, field("text", language))
+        feature[field("readTimeMinutes", language)] = max(
+            1, math.ceil(char_count / lcfg["reading_chars_per_minute"])
+        )
     feature["readTimeMinutesEn"] = max(
         1,
         math.ceil(
@@ -1679,7 +1832,7 @@ def assemble_feature(
 
 
 def _body_from_feature(feature: dict) -> dict:
-    return {field: feature.get(field) for field in BODY_FIELDS}
+    return {name: feature.get(name) for name in BODY_FIELDS}
 
 
 def _issue_payload(errors: list[str]) -> list[dict]:
@@ -1837,61 +1990,59 @@ def verify_english_body(
 def _validate_translation_metadata(
     raw: Any,
     english_body: dict,
+    language: str = "ja",
     cfg: Mapping[str, Any] = FEATURE_SETTINGS,
 ) -> dict:
+    name = LANGUAGE_NAMES[language]
     errors: list[str] = []
     if not isinstance(raw, dict):
-        raise FeatureValidationError(["Japanese metadata translation must be an object"])
-    for field in ("title", "dek"):
-        value = raw.get(field)
+        raise FeatureValidationError([f"{name} metadata translation must be an object"])
+    for key in ("title", "dek"):
+        value = raw.get(key)
         if (
             not isinstance(value, str)
             or not value.strip()
-            or not _predominantly_japanese(value, cfg)
+            or not _predominantly(value, language, cfg)
         ):
-            errors.append(
-                f"Japanese translation {field} must be predominantly Japanese"
-            )
+            errors.append(f"{name} translation {key} must be predominantly {name}")
 
     expected_perspectives = english_body["perspectives"]
     translated_perspectives = raw.get("perspectives")
     if not isinstance(translated_perspectives, list):
-        errors.append("Japanese translation perspectives must be an array")
+        errors.append(f"{name} translation perspectives must be an array")
         translated_perspectives = []
     expected_perspective_ids = [item["id"] for item in expected_perspectives]
     translated_perspective_ids = [
         item.get("id") for item in translated_perspectives if isinstance(item, dict)
     ]
     if translated_perspective_ids != expected_perspective_ids:
-        errors.append(
-            "Japanese translation must preserve perspective IDs and order"
-        )
+        errors.append(f"{name} translation must preserve perspective IDs and order")
     for item in translated_perspectives:
         if not isinstance(item, dict):
             errors.append("Every translated perspective must be an object")
             continue
-        for field in ("label", "description"):
-            value = item.get(field)
+        for key in ("label", "description"):
+            value = item.get(key)
             if (
                 not isinstance(value, str)
                 or not value.strip()
-                or not _predominantly_japanese(value, cfg)
+                or not _predominantly(value, language, cfg)
             ):
                 errors.append(
-                    f"Translated perspective {field} must be predominantly Japanese"
+                    f"Translated perspective {key} must be predominantly {name}"
                 )
 
     expected_sections = english_body["sections"]
     translated_sections = raw.get("sections")
     if not isinstance(translated_sections, list):
-        errors.append("Japanese translation sections must be an array")
+        errors.append(f"{name} translation sections must be an array")
         translated_sections = []
     expected_section_ids = [item["id"] for item in expected_sections]
     translated_section_ids = [
         item.get("id") for item in translated_sections if isinstance(item, dict)
     ]
     if translated_section_ids != expected_section_ids:
-        errors.append("Japanese translation must preserve section IDs and order")
+        errors.append(f"{name} translation must preserve section IDs and order")
     for item in translated_sections:
         if not isinstance(item, dict):
             errors.append("Every translated section heading must be an object")
@@ -1900,11 +2051,9 @@ def _validate_translation_metadata(
         if (
             not isinstance(heading, str)
             or not heading.strip()
-            or not _predominantly_japanese(heading, cfg)
+            or not _predominantly(heading, language, cfg)
         ):
-            errors.append(
-                "Translated section heading must be predominantly Japanese"
-            )
+            errors.append(f"Translated section heading must be predominantly {name}")
     if errors:
         raise FeatureValidationError(errors)
     return {
@@ -1916,7 +2065,7 @@ def _validate_translation_metadata(
 
 
 def _translation_block_targets(
-    english_body: dict, cfg: Mapping[str, Any]
+    english_body: dict, lcfg: Mapping[str, Any]
 ) -> dict[str, int]:
     blocks = [
         block
@@ -1928,30 +2077,52 @@ def _translation_block_targets(
         for block in blocks
     }
     total_weight = sum(weights.values())
-    target_total = (cfg["target_min_chars"] + cfg["target_max_chars"]) // 2
+    target_total = (lcfg["target_min_chars"] + lcfg["target_max_chars"]) // 2
+    # Cap the per-block floor by the even split. A fixed floor of 100 exceeds the
+    # even split once a language's budget is small relative to the block count
+    # (Chinese reaches that at ~24 blocks), which would silently inflate the
+    # requested total and push the article past its validation ceiling.
+    floor = min(100, target_total // max(1, len(blocks)))
     targets = {
-        block_id: max(100, round(target_total * weight / total_weight))
+        block_id: max(floor, round(target_total * weight / total_weight))
         for block_id, weight in weights.items()
     }
     difference = target_total - sum(targets.values())
     if targets:
         last_id = blocks[-1]["id"]
-        targets[last_id] = max(100, targets[last_id] + difference)
+        targets[last_id] = max(floor, targets[last_id] + difference)
     return targets
 
 
-def _translate_japanese_blocks(
+def _valid_translated_block(text: Any, lcfg: Mapping[str, Any]) -> bool:
+    """Check one translated body block for script and density."""
+    if not isinstance(text, str) or not text.strip():
+        return False
+    if _cjk_ratio(text) < lcfg["body_min_ratio"]:
+        return False
+    # Body blocks are long enough that a kana check is decisive: without it a
+    # Japanese translation would satisfy the Chinese leg's density gate.
+    kana_max = lcfg.get("kana_max_ratio")
+    if kana_max is not None and _kana_ratio(text) > kana_max:
+        return False
+    return True
+
+
+def _translate_blocks(
     model: Any,
     english_body: dict,
+    language: str,
     cfg: Mapping[str, Any],
     validation_feedback: list[str] | None,
 ) -> dict[str, str]:
+    name = LANGUAGE_NAMES[language]
+    lcfg = _lang_cfg(cfg, language)
     instructions = render_prompt(
-        PROMPTS["translate_ja_blocks"],
-        validation_min_chars=str(cfg["validation_min_chars"]),
-        validation_max_chars=str(cfg["validation_max_chars"]),
+        PROMPTS[f"translate_{language}_blocks"],
+        validation_min_chars=str(lcfg["validation_min_chars"]),
+        validation_max_chars=str(lcfg["validation_max_chars"]),
     )
-    targets = _translation_block_targets(english_body, cfg)
+    targets = _translation_block_targets(english_body, lcfg)
     blocks = [
         {
             "id": block["id"],
@@ -1979,97 +2150,183 @@ def _translate_japanese_blocks(
         items = raw.get("blockTranslations") if isinstance(raw, dict) else None
         if not isinstance(items, list):
             raise FeatureValidationError(
-                ["Japanese block translation must return blockTranslations"]
+                [f"{name} block translation must return blockTranslations"]
             )
         expected_ids = [block["id"] for block in batch]
         returned_ids = [item.get("id") for item in items if isinstance(item, dict)]
         errors: list[str] = []
         if returned_ids != expected_ids:
-            errors.append("Japanese block translation must preserve IDs and order")
+            errors.append(f"{name} block translation must preserve IDs and order")
         for item in items:
             if not isinstance(item, dict):
-                errors.append("Every Japanese block translation must be an object")
+                errors.append(f"Every {name} block translation must be an object")
                 continue
             block_id = item.get("id")
             text = item.get("text")
-            if (
-                block_id not in expected_ids
-                or not isinstance(text, str)
-                or not text.strip()
-                or _japanese_ratio(text) < cfg["japanese_body_min_ratio"]
-            ):
-                errors.append(
-                    f"Japanese block translation {block_id!r} is invalid"
-                )
+            if block_id not in expected_ids or not _valid_translated_block(text, lcfg):
+                errors.append(f"{name} block translation {block_id!r} is invalid")
                 continue
             translated[block_id] = text.strip()
         if errors:
             raise FeatureValidationError(errors)
     if set(translated) != {block["id"] for block in blocks}:
         raise FeatureValidationError(
-            ["Japanese translation must include every English block"]
+            [f"{name} translation must include every English block"]
         )
     return translated
 
 
-def _merge_bilingual_body(
+def _build_translation_payload(
     english_body: dict,
     metadata: dict,
     block_texts: Mapping[str, str],
-    translation_revision_count: int,
 ) -> dict:
-    metadata_perspectives = {
-        item["id"]: item for item in metadata["perspectives"]
-    }
+    """Assemble one translation into the same flat shape as the English body.
+
+    Keeping the payload unsuffixed lets article_character_count, the verification
+    payload builder and the body validators operate on it unchanged, and keeps the
+    per-language legs independent of one another.
+    """
+    metadata_perspectives = {item["id"]: item for item in metadata["perspectives"]}
     metadata_sections = {item["id"]: item for item in metadata["sections"]}
-    perspectives = [
-        {
-            "id": item["id"],
-            "label": metadata_perspectives[item["id"]]["label"],
-            "description": metadata_perspectives[item["id"]]["description"],
-            "labelEn": item["label"],
-            "descriptionEn": item["description"],
-            "sourceIds": list(item["sourceIds"]),
-        }
-        for item in english_body["perspectives"]
-    ]
-    sections = []
-    for section in english_body["sections"]:
-        sections.append(
+    return {
+        "title": metadata["title"],
+        "dek": metadata["dek"],
+        "perspectives": [
+            {
+                "id": item["id"],
+                "label": metadata_perspectives[item["id"]]["label"],
+                "description": metadata_perspectives[item["id"]]["description"],
+                "sourceIds": list(item["sourceIds"]),
+            }
+            for item in english_body["perspectives"]
+        ],
+        "sections": [
             {
                 "id": section["id"],
                 "heading": metadata_sections[section["id"]]["heading"],
-                "headingEn": section["heading"],
                 "blocks": [
                     {
                         "id": block["id"],
                         "text": block_texts[block["id"]],
-                        "textEn": block["text"],
                         "sourceIds": list(block["sourceIds"]),
                     }
                     for block in section["blocks"]
                 ],
             }
+            for section in english_body["sections"]
+        ],
+    }
+
+
+def merge_translations(
+    english_body: dict,
+    translations: Mapping[str, dict],
+    revision_counts: Mapping[str, int],
+) -> dict:
+    """Interleave the English body and its translations into a published body.
+
+    This is the only function that knows the field-suffix convention: Japanese is
+    the unsuffixed base field, English is *En and Chinese is *Zh.
+    """
+    languages = list(translations)
+
+    def variants(base: str, english_value: Any, translated: Mapping[str, Any]) -> dict:
+        """Emit {baseEn: english, base: japanese, baseZh: chinese} for one field."""
+        values = {field(base, "en"): english_value}
+        for language in languages:
+            values[field(base, language)] = translated[language]
+        return values
+
+    def aligned(collection: str, index: int) -> dict:
+        """Return each language's item at `index`.
+
+        Positional alignment is safe because _validate_translation_metadata
+        rejects any translation that does not preserve IDs and order.
+        """
+        return {
+            language: translations[language][collection][index]
+            for language in languages
+        }
+
+    perspectives = []
+    for index, item in enumerate(english_body["perspectives"]):
+        peers = aligned("perspectives", index)
+        perspectives.append(
+            {
+                "id": item["id"],
+                **variants(
+                    "label",
+                    item["label"],
+                    {lang: peer["label"] for lang, peer in peers.items()},
+                ),
+                **variants(
+                    "description",
+                    item["description"],
+                    {lang: peer["description"] for lang, peer in peers.items()},
+                ),
+                "sourceIds": list(item["sourceIds"]),
+            }
         )
+
+    sections = []
+    for index, section in enumerate(english_body["sections"]):
+        peers = aligned("sections", index)
+        blocks = []
+        for block_index, block in enumerate(section["blocks"]):
+            blocks.append(
+                {
+                    "id": block["id"],
+                    **variants(
+                        "text",
+                        block["text"],
+                        {
+                            lang: peer["blocks"][block_index]["text"]
+                            for lang, peer in peers.items()
+                        },
+                    ),
+                    "sourceIds": list(block["sourceIds"]),
+                }
+            )
+        sections.append(
+            {
+                "id": section["id"],
+                **variants(
+                    "heading",
+                    section["heading"],
+                    {lang: peer["heading"] for lang, peer in peers.items()},
+                ),
+                "blocks": blocks,
+            }
+        )
+
     return {
-        "title": metadata["title"],
-        "titleEn": english_body["title"],
-        "dek": metadata["dek"],
-        "dekEn": english_body["dek"],
+        **variants(
+            "title",
+            english_body["title"],
+            {lang: body["title"] for lang, body in translations.items()},
+        ),
+        **variants(
+            "dek",
+            english_body["dek"],
+            {lang: body["dek"] for lang, body in translations.items()},
+        ),
         "summaryEn": english_body["summary"],
         "keyPointsEn": list(english_body["keyPoints"]),
         "perspectives": perspectives,
         "sections": sections,
-        "translation": {
-            "targetLanguage": "ja",
-            "status": "pending",
-            "revisionCount": translation_revision_count,
+        "translations": {
+            language: {
+                "status": "passed",
+                "revisionCount": revision_counts.get(language, 0),
+            }
+            for language in languages
         },
     }
 
 
 def _translation_verification_payload(
-    english_body: dict, bilingual_body: dict
+    english_body: dict, translated_body: dict, language: str
 ) -> dict:
     return {
         "canonicalEnglish": {
@@ -2078,16 +2335,17 @@ def _translation_verification_payload(
             "perspectives": english_body["perspectives"],
             "sections": english_body["sections"],
         },
-        "japaneseTranslation": {
-            "title": bilingual_body["title"],
-            "dek": bilingual_body["dek"],
+        "targetLanguage": language,
+        "translation": {
+            "title": translated_body["title"],
+            "dek": translated_body["dek"],
             "perspectives": [
                 {
                     "id": item["id"],
                     "label": item["label"],
                     "description": item["description"],
                 }
-                for item in bilingual_body["perspectives"]
+                for item in translated_body["perspectives"]
             ],
             "sections": [
                 {
@@ -2098,7 +2356,7 @@ def _translation_verification_payload(
                         for block in section["blocks"]
                     ],
                 }
-                for section in bilingual_body["sections"]
+                for section in translated_body["sections"]
             ],
         },
     }
@@ -2107,11 +2365,20 @@ def _translation_verification_payload(
 def translate_english_body(
     model: Any,
     english_body: dict,
+    language: str = "ja",
     cfg: Mapping[str, Any] = FEATURE_SETTINGS,
 ) -> tuple[dict, int]:
-    """Translate a verified English edition and require bilingual fidelity."""
-    metadata_instructions = render_prompt(PROMPTS["translate_ja_metadata"])
-    verification_instructions = render_prompt(PROMPTS["verify_translation"])
+    """Translate a verified English edition into one language, checking fidelity.
+
+    Returns a flat payload shaped like `english_body` plus the revision count.
+    Callers combine the per-language payloads with `merge_translations`.
+    """
+    name = LANGUAGE_NAMES[language]
+    lcfg = _lang_cfg(cfg, language)
+    metadata_instructions = render_prompt(PROMPTS[f"translate_{language}_metadata"])
+    verification_instructions = render_prompt(
+        PROMPTS["verify_translation"], target_language_name=name
+    )
     retry_max = max(1, int(cfg.get("translation_retry_max", 1)))
     feedback: list[str] | None = None
     for attempt in range(retry_max):
@@ -2141,37 +2408,38 @@ def translate_english_body(
                 "feature translation",
             )
             metadata = _validate_translation_metadata(
-                raw_metadata, english_body, cfg
+                raw_metadata, english_body, language, cfg
             )
-            block_texts = _translate_japanese_blocks(
-                model, english_body, cfg, feedback
+            block_texts = _translate_blocks(
+                model, english_body, language, cfg, feedback
             )
-            bilingual_body = _merge_bilingual_body(
-                english_body, metadata, block_texts, attempt
+            translated_body = _build_translation_payload(
+                english_body, metadata, block_texts
             )
-            japanese_chars = article_character_count(bilingual_body)
+            character_count = article_character_count(translated_body)
             if not (
-                cfg["validation_min_chars"]
-                <= japanese_chars
-                <= cfg["validation_max_chars"]
+                lcfg["validation_min_chars"]
+                <= character_count
+                <= lcfg["validation_max_chars"]
             ):
                 raise FeatureValidationError(
                     [
-                        f"Japanese translation has {japanese_chars} characters; "
-                        f"required range is {cfg['validation_min_chars']}-"
-                        f"{cfg['validation_max_chars']}"
+                        f"{name} translation has {character_count} characters; "
+                        f"required range is {lcfg['validation_min_chars']}-"
+                        f"{lcfg['validation_max_chars']}"
                     ]
                 )
             verdict = model.complete(
                 verification_instructions,
-                _translation_verification_payload(english_body, bilingual_body),
+                _translation_verification_payload(
+                    english_body, translated_body, language
+                ),
                 cfg["translation_verification_max_tokens"],
                 "translation verification",
             )
-            verdict = validate_verdict(verdict, bilingual_body)
+            verdict = validate_verdict(verdict, translated_body)
             if verdict["status"] == "pass":
-                bilingual_body["translation"]["status"] = "passed"
-                return bilingual_body, attempt
+                return translated_body, attempt
             feedback = [
                 f"{issue['blockId']}: {issue['reason']}"
                 for issue in verdict["issues"]
@@ -2181,15 +2449,15 @@ def translate_english_body(
         if attempt == retry_max - 1:
             raise FeatureValidationError(
                 [
-                    "English-to-Japanese translation failed after "
+                    f"English-to-{name} translation failed after "
                     f"{retry_max} attempt(s): " + "; ".join(feedback or [])
                 ]
             )
         print(
-            "  [warn] AI English-to-Japanese translation requested a revision "
+            f"  [warn] AI English-to-{name} translation requested a revision "
             f"({attempt + 1}/{retry_max}, errors={len(feedback or [])})"
         )
-    raise FeatureError("AI English-to-Japanese translation loop exited unexpectedly")
+    raise FeatureError(f"AI English-to-{name} translation loop exited unexpectedly")
 
 
 def revise_body(
@@ -2226,7 +2494,7 @@ def _only_short_body_expansion_errors(errors: list[str]) -> bool:
     prefixes = (
         "Every source must be cited; unused: ",
         "Japanese body has ",
-        "Estimated reading time must be ",
+        "Estimated ",
     )
     return bool(errors) and all(error.startswith(prefixes) for error in errors)
 
@@ -2388,7 +2656,7 @@ def expand_short_body(
                 or block_id in candidate_additions
                 or not isinstance(text, str)
                 or not text.strip()
-                or not JAPANESE_CHAR_RE.search(text)
+                or not CJK_CHAR_RE.search(text)
                 or not _valid_source_ids(source_ids, known_source_ids)
                 or not set(existing_source_ids.get(block_id, []))
                 <= set(source_ids if isinstance(source_ids, list) else [])
@@ -2430,7 +2698,7 @@ def expand_short_body(
                 f"Short-body additions have {addition_chars} characters; required "
                 f"range is {addition_min}-{addition_max}"
             )
-        if _japanese_ratio(addition_text) < cfg["japanese_body_min_ratio"]:
+        if _cjk_ratio(addition_text) < cfg["japanese_body_min_ratio"]:
             errors.append("Short-body additions must be predominantly Japanese")
         if not errors:
             addition_by_id = candidate_additions
@@ -2597,7 +2865,7 @@ def _revise_grounding_block_batch(
                 or not text.strip()
                 or (
                     language == "ja"
-                    and _japanese_ratio(text) < cfg["japanese_body_min_ratio"]
+                    and _cjk_ratio(text) < cfg["japanese_body_min_ratio"]
                 )
                 or (language == "en" and not _predominantly_english(text))
                 or not _valid_source_ids(source_ids, known_source_ids)
@@ -2784,17 +3052,20 @@ def _atomic_json_temp(path: Path, payload: dict) -> Path:
 
 
 def feature_index_entry(feature: dict) -> dict:
+    # The homepage spotlight reads this index rather than the full feature, so
+    # every language it can render needs its title, standfirst and reading time.
+    editions = ["en", *translation_target_languages()]
+    localized = {
+        field(base, language): feature[field(base, language)]
+        for base in ("title", "dek", "readTimeMinutes")
+        for language in editions
+    }
     return {
         "slug": feature["slug"],
         "type": feature["type"],
         "date": feature["date"],
-        "readTimeMinutes": feature["readTimeMinutes"],
-        "readTimeMinutesEn": feature["readTimeMinutesEn"],
+        **localized,
         "sourceCount": len(feature["sources"]),
-        "title": feature["title"],
-        "titleEn": feature["titleEn"],
-        "dek": feature["dek"],
-        "dekEn": feature["dekEn"],
         "file": f"{feature['slug']}.json",
         "topicKey": feature["topicKey"],
         "searchTerms": feature["searchTerms"],
@@ -3037,12 +3308,18 @@ def run_feature_pipeline(
             ]
         )
 
-    body, translation_revision_count = translate_english_body(
-        model, english_body, cfg
-    )
-    body["translation"]["verifiedAt"] = generated_at.astimezone(
-        timezone.utc
-    ).isoformat()
+    # Every target language is translated from the same verified English body, so
+    # the legs are independent and their order does not affect the result.
+    translations: dict[str, dict] = {}
+    revision_counts: dict[str, int] = {}
+    for language in translation_target_languages(cfg):
+        translations[language], revision_counts[language] = translate_english_body(
+            model, english_body, language, cfg
+        )
+    body = merge_translations(english_body, translations, revision_counts)
+    verified_at = generated_at.astimezone(timezone.utc).isoformat()
+    for entry in body["translations"].values():
+        entry["verifiedAt"] = verified_at
     feature = assemble_feature(
         body,
         plan=plan,
@@ -3055,9 +3332,8 @@ def run_feature_pipeline(
     feature["verification"] = {
         "status": "passed",
         "revisionCount": verifier_revision_count,
-        "verifiedAt": generated_at.astimezone(timezone.utc).isoformat(),
+        "verifiedAt": verified_at,
         "canonicalLanguage": "en",
-        "translationRevisionCount": translation_revision_count,
     }
     validate_feature(feature, cfg)
     if not dry_run:

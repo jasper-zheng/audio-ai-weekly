@@ -38,7 +38,8 @@ class TestProviderConfiguration:
     def test_repository_settings_define_both_providers(self):
         root = Path(__file__).parent.parent
         settings = yaml.safe_load((root / "config/settings.yaml").read_text())
-        assert settings["ai"]["provider"] == "gemini"
+        # Either provider may be selected; both must stay fully configured.
+        assert settings["ai"]["provider"] in ("gemini", "github_models")
         assert settings["github_models"]["api_key_env"] == "GITHUB_TOKEN"
         assert (
             settings["github_models"]["endpoint"]
@@ -49,7 +50,7 @@ class TestProviderConfiguration:
             "api_key_env": "GEMINI_API_KEY",
             "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/",
             "model": "gemini-3.5-flash",
-            "request_limit_per_run": 20,
+            "request_limit_per_run": 40,
             "feature_max_tokens": 64000,
             "max_tokens": 16000,
             "batch_size": 5,

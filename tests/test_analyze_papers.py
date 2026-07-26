@@ -137,14 +137,26 @@ def test_analyze_batch_uses_explicit_fallback_provider(monkeypatch):
 
 
 def test_system_prompt_preserves_exact_japanese_terminology():
-    assert "音源分離" in SYSTEM_PROMPT
+    assert "音声生成" in SYSTEM_PROMPT
+    assert "ニューラル音声コーデック" in SYSTEM_PROMPT
     assert "音響信号処理" in SYSTEM_PROMPT
     assert "音響イベント" in SYSTEM_PROMPT
 
 
-def test_prompt_requests_bilingual_analysis_fields():
-    for field in ("taskEn", "whatEn", "novelEn", "methodEn", "validationEn", "discussionEn"):
-        assert field in BATCH_PROMPT_TEMPLATE
+def test_system_prompt_preserves_exact_chinese_terminology():
+    assert "音频生成" in SYSTEM_PROMPT
+    assert "神经音频编解码器" in SYSTEM_PROMPT
+    assert "声学信号处理" in SYSTEM_PROMPT
+    # Chinese must never be written with kana.
+    assert "kana" in SYSTEM_PROMPT
+
+
+def test_prompt_requests_every_translated_analysis_field():
+    for base in ("task", "what", "novel", "method", "validation", "discussion"):
+        for suffix in ("En", "Zh"):
+            assert f"{base}{suffix}" in BATCH_PROMPT_TEMPLATE
+    for name in ("titleJa", "titleZh", "abstractJa", "abstractZh"):
+        assert name in BATCH_PROMPT_TEMPLATE
 
 
 def test_prompt_forbids_affiliation_generation_and_overclaiming():

@@ -12,7 +12,7 @@ arxiv:
   request_timeout: 30       # API request timeout in seconds
   retry_max: 3              # Maximum API attempts
   retry_interval: 5.0       # Initial retry interval in seconds
-  user_agent: "audio-ai-weekly/1.0 (github.com/kasahart/audio-ai-weekly)"
+  user_agent: "audio-ai-weekly/1.0 (github.com/jasper-zheng/audio-ai-weekly)"
   page_size: 100             # Papers requested per arXiv API page
   id_verification_batch_size: 50 # Related-paper IDs verified per API request
   max_authors: 5             # Authors retained in published data
@@ -21,7 +21,7 @@ arxiv:
 
 # External metadata API settings
 metadata:
-  user_agent: "audio-ai-weekly/1.0 (github.com/kasahart/audio-ai-weekly)"
+  user_agent: "audio-ai-weekly/1.0 (github.com/jasper-zheng/audio-ai-weekly)"
   request_timeout: 10
   arxiv_request_timeout: 15
   paper_interval: 0.5
@@ -71,6 +71,24 @@ features:
   english_reading_words_per_minute: 225
   english_summary_min_words: 60
   english_summary_max_words: 250
+  # Simplified Chinese edition. Chinese is denser than Japanese, so the character
+  # band is ~0.6x the Japanese one for the same canonical English body.
+  # INVARIANT: ceil(chinese_validation_min_chars / chinese_reading_chars_per_minute)
+  # must equal reading_minutes_min, and the max counterpart reading_minutes_max.
+  # ceil(1900/270) == 8 and ceil(3200/270) == 12, so the Chinese edition reuses the
+  # shared 8-12 minute band. Guarded by a test; see tests/test_generate_feature.py.
+  chinese_target_min_chars: 2100
+  chinese_target_max_chars: 2900
+  chinese_validation_min_chars: 1900
+  chinese_validation_max_chars: 3200
+  chinese_reading_chars_per_minute: 270
+  chinese_body_min_ratio: 0.5
+  chinese_metadata_min_ratio: 0.25
+  # Chinese never uses kana, so any meaningful kana density means the model
+  # returned Japanese. A ratio (not a presence test) tolerates a stray "・"/"ー".
+  chinese_kana_max_ratio: 0.01
+  # Target languages translated from the canonical English edition, in order.
+  translation_target_languages: [ja, zh]
   selection_max_tokens: 16000
   generation_max_tokens: 16000
   verification_max_tokens: 16000
@@ -116,7 +134,7 @@ backfill:
 
 # AI provider selection
 ai:
-  provider: "gemini"  # "github_models" or "gemini"
+  provider: "github_models"  # "github_models" or "gemini"
 
 # GitHub Models settings
 github_models:
@@ -128,8 +146,11 @@ github_models:
   feature_linked_candidate_min: 1
   feature_abstract_max_chars: 1000
   max_tokens: 1500
-  batch_size: 5
-  batch_max_tokens: 6000
+  # Weekly analysis returns ja+en+zh in one response, so a batch of 5 papers no
+  # longer fits in 6000 tokens. Smaller batches keep each response well clear of
+  # the truncation ceiling.
+  batch_size: 3
+  batch_max_tokens: 8000
   min_request_interval: 60.0
   retry_max: 3
   retry_interval: 5.0       # Retry interval in seconds
@@ -139,7 +160,11 @@ gemini:
   api_key_env: "GEMINI_API_KEY"
   endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/"
   model: "gemini-3.5-flash"
-  request_limit_per_run: 20
+  # Spend circuit-breaker, NOT a worst-case sizing: one budget unit is consumed per
+  # HTTP attempt (max_retries=0), so model_retry_max multiplies every logical call.
+  # A feature run costs ~11 logical calls on the happy path with the ja+zh
+  # translation legs; 40 leaves room for roughly one full retry per language.
+  request_limit_per_run: 40
   feature_max_tokens: 64000
   max_tokens: 16000
   batch_size: 5

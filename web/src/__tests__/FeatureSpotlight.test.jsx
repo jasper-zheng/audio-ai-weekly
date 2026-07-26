@@ -8,11 +8,14 @@ const FEATURE = {
   date: '2026-07-18',
   readTimeMinutes: 8,
   readTimeMinutesEn: 6,
+  readTimeMinutesZh: 9,
   sourceCount: 4,
   title: '空間オーディオエージェント入門',
   titleEn: 'A Primer on Spatial Audio Agents',
+  titleZh: '空间音频智能体入门',
   dek: '音を聞いて空間を理解するモデルの現在地を解説する。',
   dekEn: 'A concise guide to models that listen and reason about space.',
+  dekZh: '概述能够听声并理解空间的模型的当前进展。',
 }
 
 describe('FeatureSpotlight', () => {
@@ -45,6 +48,21 @@ describe('FeatureSpotlight', () => {
       .toHaveAttribute('href', './features/spatial-audio-agents/en/')
     expect(screen.getByRole('link', { name: /Feature archive/ }))
       .toHaveAttribute('href', './features/en/')
+  })
+
+  it('renders Chinese copy and links to the Chinese edition', () => {
+    render(<FeatureSpotlight feature={FEATURE} lang="zh" />)
+
+    expect(screen.getByRole('heading', { name: FEATURE.titleZh })).toBeInTheDocument()
+    expect(screen.getByText(FEATURE.dekZh)).toBeInTheDocument()
+    expect(screen.queryByText(FEATURE.dek)).not.toBeInTheDocument()
+    expect(screen.getByText('领域解读')).toBeInTheDocument()
+    expect(screen.getByText('阅读 9 分钟')).toBeInTheDocument()
+    expect(screen.getByText('来源 4 篇')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: `阅读专题: ${FEATURE.titleZh}` }))
+      .toHaveAttribute('href', './features/spatial-audio-agents/zh/')
+    expect(screen.getByRole('link', { name: /专题列表/ }))
+      .toHaveAttribute('href', './features/zh/')
   })
 
   it('renders nothing without a feature', () => {

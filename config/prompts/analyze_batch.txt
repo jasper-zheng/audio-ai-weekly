@@ -4,27 +4,35 @@ Return one result per paper ID as a JSON object only. Use the paper ID as each k
 {
   "<paper_id>": {
     "titleJa": "Natural Japanese title translation",
+    "titleZh": "Natural Simplified Chinese title translation",
     "task": "One- or two-word task classification",
     "taskEn": "English task classification",
+    "taskZh": "Simplified Chinese task classification",
     "proposedMethod": "Named method or abbreviation, or null",
     "datasets": ["Dataset name 1", "Dataset name 2"],
     "what": "One- or two-sentence overview",
     "whatEn": "Equivalent English overview",
+    "whatZh": "Equivalent Simplified Chinese overview",
     "novel": "One- or two-sentence summary of novelty claimed by the authors in the abstract",
     "novelEn": "Equivalent English summary framed as author-claimed novelty",
+    "novelZh": "Equivalent Simplified Chinese summary framed as author-claimed novelty",
     "method": "One- or two-sentence technical summary",
     "methodEn": "Equivalent English technical summary",
+    "methodZh": "Equivalent Simplified Chinese technical summary",
     "validation": "One- or two-sentence validation summary",
     "validationEn": "Equivalent English validation summary",
+    "validationZh": "Equivalent Simplified Chinese validation summary",
     "discussion": "One- or two-sentence limitations summary",
     "discussionEn": "Equivalent English limitations summary",
+    "discussionZh": "Equivalent Simplified Chinese limitations summary",
     "abstractJa": "Complete natural Japanese abstract translation",
+    "abstractZh": "Complete natural Simplified Chinese abstract translation",
     "nextReads": [
       {"label": "Related paper title (year)", "id": "arXiv ID or null"}
     ]
   }
 }
 
-Return three or four nextReads candidates per paper, keep their labels as original English paper titles, and use null for unknown arXiv IDs. Candidates will be published only after their IDs and titles are matched against official arXiv API metadata. List up to five training or evaluation datasets. Write base fields in Japanese and fields ending in En in English.
+Return three or four nextReads candidates per paper, keep their labels as original English paper titles, and use null for unknown arXiv IDs. Candidates will be published only after their IDs and titles are matched against official arXiv API metadata. List up to five training or evaluation datasets. Write base fields in Japanese, fields ending in En in English, and fields ending in Zh in Simplified Chinese. Never write Japanese kana in a Zh field.
 
 {{papers}}

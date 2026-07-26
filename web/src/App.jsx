@@ -5,7 +5,14 @@ import CategoryFilter from './components/CategoryFilter'
 import PaperCard from './components/PaperCard'
 import TrendSummary from './components/TrendSummary'
 import FeatureSpotlight from './components/FeatureSpotlight'
-import { LANGUAGE_STORAGE_KEY, t } from './i18n.js'
+import {
+  HTML_LANG,
+  LANGUAGE_STORAGE_KEY,
+  SOURCE_FIELD_SUFFIX,
+  allVariants,
+  localized,
+  t,
+} from './i18n.js'
 
 const DATA_BASE = './data'
 const LS_FAVORITES = 'arxiv-favorites'
@@ -170,7 +177,10 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
-    document.documentElement.lang = lang
+    // BCP-47, not the bare code: no CJK webfont is loaded, so the browser picks
+    // Han glyphs from the document language and a bare "zh" would render
+    // Japanese glyph variants.
+    document.documentElement.lang = HTML_LANG[lang] ?? lang
     document.title = t(lang).pageTitle
   }, [lang])
 
@@ -423,7 +433,14 @@ export default function App() {
                 if (showFavoritesOnly && !favorites.has(id)) return false
                 if (search) {
                   const q = search.toLowerCase()
-                  return `${p.title} ${p.titleJa ?? ''} ${p.abstract ?? ''} ${p.abstractJa ?? ''} ${p.task ?? ''} ${p.taskEn ?? ''} ${p.what ?? ''} ${p.whatEn ?? ''}`.toLowerCase().includes(q)
+                  // Language-blind: every variant of every searchable field, so
+                  // a query matches whichever language the reader typed.
+                  return [
+                    ...allVariants(p, 'title', SOURCE_FIELD_SUFFIX),
+                    ...allVariants(p, 'abstract', SOURCE_FIELD_SUFFIX),
+                    ...allVariants(p, 'task'),
+                    ...allVariants(p, 'what'),
+                  ].join(' ').toLowerCase().includes(q)
                 }
                 return true
               }),
@@ -450,16 +467,18 @@ export default function App() {
               </div>
 
               {activeCat === 'all' && !showFavoritesOnly && !search && (
-                <TrendSummary trend={lang === 'en' ? (week.trendEn || week.trend) : (week.trend || week.trendEn)} lang={lang} />
+                <TrendSummary trend={localized(week, 'trend', lang) || []} lang={lang} />
               )}
 
               {filteredCats.map((cat, ci) => (
                 <div key={cat.id} style={{ marginBottom: 36 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                     <span style={{ fontSize: 15, color: cat.color, fontWeight: 600, letterSpacing: 2 }}>
-                      {lang === 'en'
-                        ? (allCategories.find(definition => definition.id === cat.id)?.labelEn || cat.labelEn || (cat.id === 'other' ? 'Other' : cat.label))
-                        : cat.label}
+                      {/* Prefer the index definition, which carries the current
+                          labels from keywords.yaml, over the copy frozen into
+                          each weekly file when it was built. */}
+                      {localized(allCategories.find(definition => definition.id === cat.id) ?? {}, 'label', lang)
+                        || localized(cat, 'label', lang)}
                     </span>
                     <div style={{ flex: 1, height: 1, background: `${cat.color}25` }} />
                     <span style={{ fontSize: 11, color: '#334155' }}>{t(lang).papers(cat.papers.length)}</span>

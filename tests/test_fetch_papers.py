@@ -21,15 +21,15 @@ from fetch_papers import (
 # ── keyword_match ──────────────────────────────────────────────────────
 
 class TestKeywordMatch:
-    INCLUDE = ["source separation", "anomaly detection"]
+    INCLUDE = ["audio generation", "neural audio codec"]
     EXCLUDE = ["retracted"]
 
     def test_matches_title(self):
-        paper = {"title": "Audio Source Separation using Transformers", "abstract": ""}
+        paper = {"title": "Audio Generation using Transformers", "abstract": ""}
         assert keyword_match(paper, self.INCLUDE, self.EXCLUDE) is True
 
     def test_matches_abstract(self):
-        paper = {"title": "A new method", "abstract": "We propose anomaly detection for machines"}
+        paper = {"title": "A new method", "abstract": "We propose a neural audio codec"}
         assert keyword_match(paper, self.INCLUDE, self.EXCLUDE) is True
 
     def test_no_match(self):
@@ -37,16 +37,28 @@ class TestKeywordMatch:
         assert keyword_match(paper, self.INCLUDE, self.EXCLUDE) is False
 
     def test_exclude_overrides_include(self):
-        paper = {"title": "Retracted: Source Separation", "abstract": ""}
+        paper = {"title": "Retracted: Audio Generation", "abstract": ""}
         assert keyword_match(paper, self.INCLUDE, self.EXCLUDE) is False
 
     def test_case_insensitive(self):
-        paper = {"title": "ANOMALY DETECTION", "abstract": ""}
+        paper = {"title": "NEURAL AUDIO CODEC", "abstract": ""}
         assert keyword_match(paper, self.INCLUDE, self.EXCLUDE) is True
 
     def test_empty_include_no_match(self):
-        paper = {"title": "Source Separation", "abstract": ""}
+        paper = {"title": "Audio Generation", "abstract": ""}
         assert keyword_match(paper, [], self.EXCLUDE) is False
+
+    def test_matching_is_substring_based_so_keywords_must_not_be_padded(self):
+        # keyword_match uses plain substring containment, so a keyword with
+        # surrounding whitespace silently stops matching.
+        paper = {"title": "Sound generation for video", "abstract": ""}
+        assert keyword_match(paper, ["sound generation"], self.EXCLUDE) is True
+        assert keyword_match(paper, ["sound generation "], self.EXCLUDE) is True
+        assert keyword_match(
+            {"title": "Sound generation.", "abstract": ""},
+            ["sound generation "],
+            self.EXCLUDE,
+        ) is False
 
 
 # ── assign_category ────────────────────────────────────────────────────
@@ -54,17 +66,17 @@ class TestKeywordMatch:
 class TestAssignCategory:
     CATEGORIES = [
         {"id": "foundation", "keywords": ["audio foundation model", "audio language model"]},
-        {"id": "separation", "keywords": ["source separation", "music separation"]},
-        {"id": "anomaly",    "keywords": ["anomaly detection", "anomalous sound"]},
+        {"id": "generation", "keywords": ["audio generation", "music generation"]},
+        {"id": "codec",      "keywords": ["neural audio codec", "audio autoencoder"]},
     ]
 
-    def test_assigns_separation(self):
-        paper = {"title": "Audio Source Separation", "abstract": "We separate sources"}
-        assert assign_category(paper, self.CATEGORIES) == "separation"
+    def test_assigns_generation(self):
+        paper = {"title": "Audio Generation", "abstract": "We generate audio"}
+        assert assign_category(paper, self.CATEGORIES) == "generation"
 
-    def test_assigns_anomaly(self):
-        paper = {"title": "Machine Anomaly Detection", "abstract": "detecting anomalous sound"}
-        assert assign_category(paper, self.CATEGORIES) == "anomaly"
+    def test_assigns_codec(self):
+        paper = {"title": "A Neural Audio Codec", "abstract": "an audio autoencoder"}
+        assert assign_category(paper, self.CATEGORIES) == "codec"
 
     def test_assigns_foundation(self):
         paper = {"title": "Audio Language Model", "abstract": "large audio foundation model"}
@@ -75,7 +87,7 @@ class TestAssignCategory:
         assert assign_category(paper, self.CATEGORIES) == "other"
 
     def test_first_match_wins(self):
-        paper = {"title": "Audio Language Model for Source Separation", "abstract": ""}
+        paper = {"title": "Audio Language Model for Audio Generation", "abstract": ""}
         assert assign_category(paper, self.CATEGORIES) == "foundation"
 
 

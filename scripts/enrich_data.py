@@ -12,9 +12,10 @@ from pathlib import Path
 import yaml
 from openai import OpenAI
 
+from languages import LANGUAGES, field
 from model_utils import build_chat_kwargs, create_client, get_ai_config
 from analyze_papers import wait_for_next_request
-from build_data import generate_trend
+from build_data import category_labels, generate_trend, trend_fields
 
 ROOT = Path(__file__).parent.parent
 WEEKLY_DIR = ROOT / "data" / "weekly"
@@ -26,7 +27,9 @@ METADATA_SETTINGS = SETTINGS["metadata"]
 NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
 
 AI_FIELDS = ("abstractJa", "task", "taskEn", "proposedMethod", "datasets",
-             "whatEn", "novelEn", "methodEn", "validationEn", "discussionEn")
+             "whatEn", "novelEn", "methodEn", "validationEn", "discussionEn",
+             "titleZh", "abstractZh", "taskZh", "whatZh", "novelZh", "methodZh",
+             "validationZh", "discussionZh")
 
 
 def fetch_arxiv_meta(arxiv_id: str) -> dict:
@@ -181,7 +184,7 @@ def main():
     index_path = ROOT / SETTINGS["data"]["index_file"]
     index = json.loads(index_path.read_text()) if index_path.exists() else {"weeks": []}
     index["categories"] = [
-        {"id": c["id"], "label": c["label"], "labelEn": c["labelEn"], "color": c["color"]}
+        {"id": c["id"], **category_labels(c), "color": c["color"]}
         for c in KEYWORDS["ui_categories"]
     ]
     index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2))
@@ -230,17 +233,27 @@ def main():
         if ai_client:
             data = json.loads(path.read_text())
             papers = [paper for cat in data.get("categories", []) for paper in cat.get("papers", [])]
-            if papers and not data.get("trendEn"):
+            missing_trends = [
+                language
+                for language in LANGUAGES
+                if not data.get(field("trend", language))
+            ]
+            if papers and missing_trends:
                 wait_for_next_request(last_trend_request_at, cfg["min_request_interval"])
-                trend, trend_en = generate_trend(ai_client, papers)
+                trend = generate_trend(ai_client, papers)
                 last_trend_request_at = time.monotonic()
-                if trend and not data.get("trend"):
-                    data["trend"] = trend
-                if trend_en:
-                    data["trendEn"] = trend_en
-                if trend or trend_en:
+                # Never overwrite an existing translation; only fill the gaps.
+                added = {
+                    name: lines
+                    for name, lines in trend_fields(trend).items()
+                    if not data.get(name)
+                }
+                if added:
+                    data.update(added)
                     path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
-                    print(f"[enrich] Added bilingual trends -> {path.name}")
+                    print(
+                        f"[enrich] Added trends ({', '.join(sorted(added))}) -> {path.name}"
+                    )
 
     print("\n[enrich] Complete.")
 

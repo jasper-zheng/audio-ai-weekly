@@ -1,8 +1,9 @@
-import { t } from '../i18n.js'
+import { SUPPORTED_LANGUAGES, t } from '../i18n.js'
 
 export default function Header({ total, loading, lang = 'ja', onLanguageChange }) {
   const copy = t(lang)
-  const featureArchiveHref = lang === 'en' ? './features/en/' : './features/'
+  // Japanese is the default edition and lives at the archive root.
+  const featureArchiveHref = lang === 'ja' ? './features/' : `./features/${lang}/`
   return (
     <div style={{ position: 'relative', borderBottom: '1px solid #1e293b', background: '#0a0d14',
       padding: 'clamp(12px,3vw,18px) clamp(12px,4vw,26px) 14px' }}>
@@ -31,7 +32,7 @@ export default function Header({ total, loading, lang = 'ja', onLanguageChange }
         </a>
       </nav>
       <div aria-label="Language" style={{ position: 'absolute', top: 16, right: 20, fontSize: 11 }}>
-        {['ja', 'en'].map((value, index) => <span key={value}>
+        {SUPPORTED_LANGUAGES.map((value, index) => <span key={value}>
           {index > 0 && <span style={{ color: '#334155', margin: '0 6px' }}>/</span>}
           <button onClick={() => onLanguageChange?.(value)} aria-pressed={lang === value}
             style={{ background: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit',

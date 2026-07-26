@@ -15,10 +15,10 @@
 
 | 項目 | 内容 |
 |---|---|
-| プロジェクト名 | Audio AI Weekly / 音響AI週報 |
-| 対象分野 | 音の基盤モデル・音源分離・異音検知 |
+| プロジェクト名 | Audio AI Weekly / 音響AI週報 / 音频AI周报 |
+| 対象分野 | 音の基盤モデル・音声生成・音声コーデック |
 | 更新頻度 | 毎週金曜日 21:00 JST（GitHub Actions cron） |
-| AI 解析エンジン | GitHub Models（Claude）／ `GITHUB_TOKEN` 認証 |
+| AI 解析エンジン | `config/settings.yaml` の `ai.provider` で選択（`github_models` / `gemini`）|
 | フロントエンド | React 18 + Vite → GitHub Pages で配信 |
 | データ管理 | 週次 JSON（`YYYY-MMDD.json`）＋ `index.json` で全週保持 |
 | 設計書 | 要件定義書 v1.3（`system_design.md`） |
@@ -35,7 +35,7 @@
 - ✅ `README.md`（セットアップ手順・コマンド一覧）
 
 ### 2.2 設定ファイル
-- ✅ `config/keywords.yaml` — フィルタリングキーワード（22 件、追加・削除可能）
+- ✅ `config/keywords.yaml` — フィルタリングキーワード（18 件、追加・削除可能）
 - ✅ `config/settings.yaml` — `max_papers=50`、GitHub Models エンドポイント等
 
 ### 2.3 バックエンドスクリプト（Python 3.11）
@@ -210,15 +210,27 @@ include:
 
 `ui_categories` に新エントリを追加。フロントエンドの `CategoryFilter` は categories データを動的に生成するため、コード変更は不要。
 
+ただし UI 言語ごとのラベル（`label` / `labelEn` / `labelZh`）は必須。いずれかが欠けると
+`scripts/build_data.py` がカテゴリ定義を組み立てる際に `KeyError` で失敗する。
+
 ```yaml
 ui_categories:
   - id: new_category
     label: 新カテゴリ名
+    labelEn: New Category
+    labelZh: 新类别
     color: "#e879f9"
     keywords:
       - new keyword 1
       - new keyword 2
 ```
+
+### 表示言語の追加
+
+言語コード・フィールド接尾辞・BCP-47 タグは `scripts/languages.py` と `web/src/i18n.js`
+に集約されている。4 言語目を足す場合は、この 2 ファイル、`config/settings.yaml` の
+言語別文字数バジェット、`config/prompts/feature_translate_<lang>_*.txt` の 2 ファイル、
+および `ui_categories` の `label<Lang>` を追加する。
 
 ---
 

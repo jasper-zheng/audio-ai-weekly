@@ -8,16 +8,21 @@ import enrich_data
 from enrich_data import AI_FIELDS, BATCH_PROMPT_TMPL
 
 
-def test_enrichment_prompt_preserves_japanese_task_examples():
-    assert "音源分離" in BATCH_PROMPT_TMPL
-    assert "異音検知" in BATCH_PROMPT_TMPL
+def test_enrichment_prompt_preserves_task_examples_in_every_language():
+    assert "音声生成" in BATCH_PROMPT_TMPL
     assert "音楽生成" in BATCH_PROMPT_TMPL
+    assert "音频生成" in BATCH_PROMPT_TMPL
+    assert "音频编解码" in BATCH_PROMPT_TMPL
 
 
-def test_enrichment_requests_every_english_analysis_field():
-    for field in ("taskEn", "whatEn", "novelEn", "methodEn", "validationEn", "discussionEn"):
-        assert field in AI_FIELDS
-        assert field in BATCH_PROMPT_TMPL
+def test_enrichment_requests_every_translated_analysis_field():
+    for base in ("task", "what", "novel", "method", "validation", "discussion"):
+        for suffix in ("En", "Zh"):
+            assert f"{base}{suffix}" in AI_FIELDS
+            assert f"{base}{suffix}" in BATCH_PROMPT_TMPL
+    for name in ("abstractJa", "abstractZh", "titleZh"):
+        assert name in AI_FIELDS
+        assert name in BATCH_PROMPT_TMPL
 
 
 def test_failed_ai_batch_does_not_mark_fields_complete(monkeypatch):

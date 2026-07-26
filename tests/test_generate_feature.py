@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 import generate_feature
+from languages import LANGUAGE_SUFFIX
 
 
 ENGLISH_SUMMARY = (
@@ -80,7 +81,12 @@ def make_sources():
 
 
 def make_body(
-    article_type="primer", chars_per_section=550, english_words_per_section=200
+    article_type="primer",
+    chars_per_section=550,
+    english_words_per_section=200,
+    # 6 x 405 = 2430 characters, so ceil(2430 / 270) == 9 minutes, inside the
+    # shared 8-12 minute band.
+    chinese_chars_per_section=405,
 ):
     section_ids = generate_feature.FEATURE_SETTINGS[f"{article_type}_sections"]
     sections = []
@@ -93,6 +99,7 @@ def make_body(
                 "id": section_id,
                 "heading": f"節 {index + 1}",
                 "headingEn": f"Section {index + 1}",
+                "headingZh": f"第 {index + 1} 节",
                 "blocks": [
                     {
                         "id": f"block-{index + 1}",
@@ -100,6 +107,9 @@ def make_body(
                         "textEn": " ".join(
                             ["evidence"] * english_words_per_section
                         ),
+                        # Han only: kana here would mean the Chinese leg
+                        # returned Japanese.
+                        "textZh": "评" * chinese_chars_per_section,
                         "sourceIds": source_ids,
                     }
                 ],
@@ -108,8 +118,10 @@ def make_body(
     return {
         "title": "音源分離をどう評価するか",
         "titleEn": "How to Evaluate Source Separation",
+        "titleZh": "如何评估音频分离",
         "dek": "一次資料から評価設計を読み解く。",
         "dekEn": "A primary-source guide to evaluation design.",
+        "dekZh": "从一次文献解读评估设计。",
         "summaryEn": ENGLISH_SUMMARY,
         "keyPointsEn": ["Metrics matter.", "Data matters.", "Use cases matter."],
         "perspectives": [
@@ -119,6 +131,8 @@ def make_body(
                 "description": "指標の視点",
                 "labelEn": "Metrics",
                 "descriptionEn": "The metrics perspective.",
+                "labelZh": "指标",
+                "descriptionZh": "指标视角。",
                 "sourceIds": ["S1"],
             },
             {
@@ -127,6 +141,8 @@ def make_body(
                 "description": "データの視点",
                 "labelEn": "Data",
                 "descriptionEn": "The data perspective.",
+                "labelZh": "数据",
+                "descriptionZh": "数据视角。",
                 "sourceIds": ["S2"],
             },
             {
@@ -135,17 +151,67 @@ def make_body(
                 "description": "利用の視点",
                 "labelEn": "Use",
                 "descriptionEn": "The practitioner perspective.",
+                "labelZh": "应用",
+                "descriptionZh": "实践者视角。",
                 "sourceIds": ["S3"],
             },
         ],
         "sections": sections,
-        "translation": {
-            "targetLanguage": "ja",
-            "status": "passed",
-            "revisionCount": 0,
-            "verifiedAt": "2026-07-14T00:00:00+00:00",
+        "translations": {
+            "ja": {
+                "status": "passed",
+                "revisionCount": 0,
+                "verifiedAt": "2026-07-14T00:00:00+00:00",
+            },
+            "zh": {
+                "status": "passed",
+                "revisionCount": 0,
+                "verifiedAt": "2026-07-14T00:00:00+00:00",
+            },
         },
     }
+
+
+def make_translation_payload(language="ja", article_type="primer", **kwargs):
+    """One language's flat payload, matching what translate_english_body returns.
+
+    Translation legs return an unsuffixed body shaped like the English one; the
+    suffix convention is applied later, only by merge_translations.
+    """
+    body = make_body(article_type=article_type, **kwargs)
+    suffix = LANGUAGE_SUFFIX[language]
+    return {
+        "title": body[f"title{suffix}"],
+        "dek": body[f"dek{suffix}"],
+        "perspectives": [
+            {
+                "id": item["id"],
+                "label": item[f"label{suffix}"],
+                "description": item[f"description{suffix}"],
+                "sourceIds": item["sourceIds"],
+            }
+            for item in body["perspectives"]
+        ],
+        "sections": [
+            {
+                "id": section["id"],
+                "heading": section[f"heading{suffix}"],
+                "blocks": [
+                    {
+                        "id": block["id"],
+                        "text": block[f"text{suffix}"],
+                        "sourceIds": block["sourceIds"],
+                    }
+                    for block in section["blocks"]
+                ],
+            }
+            for section in body["sections"]
+        ],
+    }
+
+
+def fake_translate(_model, _body, language, _cfg=None):
+    return make_translation_payload(language), 0
 
 
 def make_english_body(article_type="primer", words_per_section=200):
@@ -199,7 +265,6 @@ def make_feature(article_type="primer"):
         "revisionCount": 0,
         "verifiedAt": "2026-07-14T00:00:00+00:00",
         "canonicalLanguage": "en",
-        "translationRevisionCount": 0,
     }
     return feature
 
@@ -242,7 +307,7 @@ def test_load_recent_weekly_papers_dedupes_versions_and_keeps_newest(tmp_path):
             {
                 "categories": [
                     {
-                        "id": "separation",
+                        "id": "generation",
                         "papers": [
                             {"id": "2601.00001v2", "title": "Newest", "abstract": "A"}
                         ],
@@ -256,7 +321,7 @@ def test_load_recent_weekly_papers_dedupes_versions_and_keeps_newest(tmp_path):
             {
                 "categories": [
                     {
-                        "id": "separation",
+                        "id": "generation",
                         "papers": [
                             {
                                 "id": "2601.00001v1",
@@ -815,6 +880,43 @@ def test_json_model_does_not_fall_back_for_invalid_model_content(monkeypatch):
     assert len(fallback.calls) == 0
 
 
+@pytest.mark.parametrize("language", ["ja", "zh"])
+def test_reading_time_band_is_consistent_with_the_character_budget(language):
+    """The character band, the reading rate and the minute band are coupled.
+
+    validate_feature requires both readTimeMinutes == ceil(chars / rate) and that
+    the result falls inside reading_minutes_min..max. Nothing in settings.yaml
+    expresses that, so a plausible-looking rate can make every feature fail at
+    publish time. Guard it here.
+    """
+    cfg = generate_feature.FEATURE_SETTINGS
+    budget = generate_feature._lang_cfg(cfg, language)
+    rate = budget["reading_chars_per_minute"]
+
+    assert math.ceil(budget["validation_min_chars"] / rate) == cfg["reading_minutes_min"]
+    assert math.ceil(budget["validation_max_chars"] / rate) == cfg["reading_minutes_max"]
+    # The generation target must sit inside the validation tolerance.
+    assert budget["validation_min_chars"] <= budget["target_min_chars"]
+    assert budget["target_max_chars"] <= budget["validation_max_chars"]
+
+
+def test_every_translation_target_language_is_fully_configured():
+    cfg = generate_feature.FEATURE_SETTINGS
+    languages = generate_feature.translation_target_languages(cfg)
+
+    assert languages, "at least one translation target language must be configured"
+    for language in languages:
+        budget = generate_feature._lang_cfg(cfg, language)
+        assert budget["metadata_min_ratio"] > 0
+        assert budget["body_min_ratio"] > 0
+        # Every target language needs its own prompt pair.
+        assert f"translate_{language}_metadata" in generate_feature.PROMPTS
+        assert f"translate_{language}_blocks" in generate_feature.PROMPTS
+    # Chinese must carry a kana ceiling, since Han alone cannot distinguish it
+    # from Japanese.
+    assert generate_feature._lang_cfg(cfg, "zh")["kana_max_ratio"] > 0
+
+
 def test_feature_model_budgets_cover_reasoning_and_structured_output():
     cfg = generate_feature.FEATURE_SETTINGS
 
@@ -974,15 +1076,16 @@ def test_translation_preserves_english_structure_sources_and_retries_fidelity():
 
     model = TranslationModel()
     body, revision_count = generate_feature.translate_english_body(
-        model, english_body
+        model, english_body, "ja"
     )
 
     assert revision_count == 1
-    assert body["translation"] == {
-        "targetLanguage": "ja",
-        "status": "passed",
-        "revisionCount": 1,
-    }
+    # The leg returns a flat, unsuffixed payload; suffixes are applied later by
+    # merge_translations alone.
+    assert "translation" not in body
+    assert "translations" not in body
+    assert "headingEn" not in body["sections"][0]
+    assert "textEn" not in body["sections"][0]["blocks"][0]
     assert len(model.metadata_calls) == 2
     assert len(model.block_calls) == 4
     assert len(model.verification_calls) == 2
@@ -990,13 +1093,15 @@ def test_translation_preserves_english_structure_sources_and_retries_fidelity():
     assert model.metadata_calls[1]["validationFeedback"] == [
         "block-2: A qualification was omitted."
     ]
+    # The verifier envelope names the target language rather than hardcoding it.
+    assert model.verification_calls[0]["targetLanguage"] == "ja"
+    assert "translation" in model.verification_calls[0]
     assert [section["id"] for section in body["sections"]] == [
         section["id"] for section in english_body["sections"]
     ]
     for translated_section, english_section in zip(
         body["sections"], english_body["sections"], strict=True
     ):
-        assert translated_section["headingEn"] == english_section["heading"]
         assert [block["id"] for block in translated_section["blocks"]] == [
             block["id"] for block in english_section["blocks"]
         ]
@@ -1004,8 +1109,65 @@ def test_translation_preserves_english_structure_sources_and_retries_fidelity():
             translated_section["blocks"], english_section["blocks"], strict=True
         ):
             assert translated_block["text"].startswith("改")
-            assert translated_block["textEn"] == english_block["text"]
             assert translated_block["sourceIds"] == english_block["sourceIds"]
+
+
+def test_merge_translations_maps_each_language_to_its_own_suffix():
+    """The single place that knows the suffix convention, so test it directly."""
+    english_body = make_english_body()
+    payloads = {
+        language: make_translation_payload(language) for language in ("ja", "zh")
+    }
+
+    body = generate_feature.merge_translations(
+        english_body, payloads, {"ja": 0, "zh": 2}
+    )
+
+    assert body["titleEn"] == english_body["title"]
+    assert body["title"] == payloads["ja"]["title"]
+    assert body["titleZh"] == payloads["zh"]["title"]
+    assert body["dekEn"] == english_body["dek"]
+    assert body["dek"] == payloads["ja"]["dek"]
+    assert body["dekZh"] == payloads["zh"]["dek"]
+    assert body["summaryEn"] == english_body["summary"]
+    assert body["translations"] == {
+        "ja": {"status": "passed", "revisionCount": 0},
+        "zh": {"status": "passed", "revisionCount": 2},
+    }
+
+    perspective = body["perspectives"][0]
+    assert perspective["labelEn"] == english_body["perspectives"][0]["label"]
+    assert perspective["label"] == payloads["ja"]["perspectives"][0]["label"]
+    assert perspective["labelZh"] == payloads["zh"]["perspectives"][0]["label"]
+    assert perspective["descriptionZh"] == (
+        payloads["zh"]["perspectives"][0]["description"]
+    )
+
+    section = body["sections"][0]
+    assert section["headingEn"] == english_body["sections"][0]["heading"]
+    assert section["heading"] == payloads["ja"]["sections"][0]["heading"]
+    assert section["headingZh"] == payloads["zh"]["sections"][0]["heading"]
+
+    block = section["blocks"][0]
+    assert block["textEn"] == english_body["sections"][0]["blocks"][0]["text"]
+    assert block["text"] == payloads["ja"]["sections"][0]["blocks"][0]["text"]
+    assert block["textZh"] == payloads["zh"]["sections"][0]["blocks"][0]["text"]
+    assert block["sourceIds"] == english_body["sections"][0]["blocks"][0]["sourceIds"]
+    # No language may leak into another's field.
+    assert block["text"] != block["textZh"] != block["textEn"]
+
+
+def test_feature_rejects_a_translation_copied_into_another_language():
+    """A mis-wired merge is deterministic, so validation must catch it outright."""
+    feature = make_feature()
+    for section in feature["sections"]:
+        for block in section["blocks"]:
+            block["textZh"] = block["text"]
+    with pytest.raises(
+        generate_feature.FeatureValidationError,
+        match="identical in ja and zh",
+    ):
+        generate_feature.validate_feature(feature)
 
 
 def test_short_body_expansion_appends_prose_without_changing_structure():
@@ -1513,7 +1675,7 @@ def test_feature_rejects_english_dominant_mixed_body():
     feature["sections"][0]["blocks"][0]["text"] = ("あ" * 100) + ("a" * 450)
     with pytest.raises(
         generate_feature.FeatureValidationError,
-        match="Block 'block-1' must be predominantly Japanese",
+        match="Block 'block-1' text must be predominantly Japanese",
     ):
         generate_feature.validate_feature(feature)
 
@@ -1645,7 +1807,7 @@ def test_replacement_excludes_the_superseded_slot_from_topic_history(
     monkeypatch.setattr(
         generate_feature,
         "translate_english_body",
-        lambda *_args: (make_body(), 0),
+        fake_translate,
     )
 
     generate_feature.run_feature_pipeline(
@@ -1700,7 +1862,7 @@ def test_pipeline_uses_archived_sources_when_arxiv_api_is_rate_limited(
     monkeypatch.setattr(
         generate_feature,
         "translate_english_body",
-        lambda *_args: (make_body(), 0),
+        fake_translate,
     )
 
     feature = generate_feature.run_feature_pipeline(
@@ -1839,7 +2001,7 @@ def test_pipeline_allows_verifier_revision_after_local_correction(
     monkeypatch.setattr(
         generate_feature,
         "translate_english_body",
-        lambda *_args: (make_body(), 0),
+        fake_translate,
     )
 
     feature = generate_feature.run_feature_pipeline(
@@ -1853,12 +2015,13 @@ def test_pipeline_allows_verifier_revision_after_local_correction(
     )
 
     assert calls == ["patch", "patch", "patch", "patch"]
+    # Per-language revision counts live in feature["translations"], so there is
+    # no separate scalar to drift out of sync.
     assert feature["verification"] == {
         "status": "passed",
         "revisionCount": 4,
         "verifiedAt": "2026-07-14T00:00:00+00:00",
         "canonicalLanguage": "en",
-        "translationRevisionCount": 0,
     }
 
 
@@ -1889,9 +2052,9 @@ def test_pipeline_translates_only_after_canonical_english_verification(
         ),
     )
 
-    def translate(_model, body, _cfg):
-        calls.append(("translate", body))
-        return make_body(), 0
+    def translate(_model, body, language, _cfg=None):
+        calls.append(("translate", language, body))
+        return make_translation_payload(language), 0
 
     monkeypatch.setattr(generate_feature, "translate_english_body", translate)
 
@@ -1905,11 +2068,29 @@ def test_pipeline_translates_only_after_canonical_english_verification(
         now=datetime(2026, 7, 14, tzinfo=timezone.utc),
     )
 
-    assert calls == [("verify", english_body), ("translate", english_body)]
+    # Verification runs once, then every target language is translated from the
+    # same verified English body.
+    assert calls == [
+        ("verify", english_body),
+        ("translate", "ja", english_body),
+        ("translate", "zh", english_body),
+    ]
     assert feature["verification"] == {
         "status": "passed",
         "revisionCount": 0,
         "verifiedAt": "2026-07-14T00:00:00+00:00",
         "canonicalLanguage": "en",
-        "translationRevisionCount": 0,
+    }
+    # Each language records its own verification stamp.
+    assert feature["translations"] == {
+        "ja": {
+            "status": "passed",
+            "revisionCount": 0,
+            "verifiedAt": "2026-07-14T00:00:00+00:00",
+        },
+        "zh": {
+            "status": "passed",
+            "revisionCount": 0,
+            "verifiedAt": "2026-07-14T00:00:00+00:00",
+        },
     }

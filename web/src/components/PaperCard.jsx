@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { stripPrefix } from '../utils.js'
-import { localized, t } from '../i18n.js'
+import { localized, localizedSource, t } from '../i18n.js'
 
 const SECTIONS = [
   { key: 'what', icon: '1.', color: '#cbd5e1' }, { key: 'novel', icon: '2.', color: '#38bdf8' },
@@ -23,6 +23,12 @@ function Badge({ href, onClick, color, bg, children }) {
 export default function PaperCard({ paper, cat, lang = 'ja', animDelay = 0, citationCount, githubUrl, isFavorite, onToggleFavorite, isRead, onToggleRead }) {
   const [expanded, setExpanded] = useState(false)
   const copy = t(lang)
+
+  // `paper.title`/`paper.abstract` hold the raw English arXiv text, so the
+  // translations live under a language suffix. The title row always shows the
+  // original and adds the translation beneath it when one differs.
+  const translatedTitle = localizedSource(paper, 'title', lang)
+  const abstract = localizedSource(paper, 'abstract', lang)
 
   // Prefer the frontend-fetched githubUrl, then fall back to githubRepo from JSON.
   const codeUrl = githubUrl || paper.githubRepo
@@ -100,7 +106,9 @@ export default function PaperCard({ paper, cat, lang = 'ja', animDelay = 0, cita
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>{paper.org}</div>
         )}
         <div style={{ fontSize: 'clamp(13px,3.5vw,15px)', color: '#e2e8f0', lineHeight: 1.6, fontWeight: 500 }}>{paper.title}</div>
-        {lang === 'ja' && <div style={{ fontSize: 'clamp(12px,3vw,14px)', color: '#94a3b8', lineHeight: 1.6, marginTop: 3 }}>{paper.titleJa || paper.title}</div>}
+        {translatedTitle && translatedTitle !== paper.title && (
+          <div style={{ fontSize: 'clamp(12px,3vw,14px)', color: '#94a3b8', lineHeight: 1.6, marginTop: 3 }}>{translatedTitle}</div>
+        )}
         {paper.authors?.length > 0 && (
           <div style={{ fontSize: 11, color: '#475569', lineHeight: 1.6, marginTop: 4 }}>
             {paper.authors.join(', ')}
@@ -160,14 +168,14 @@ export default function PaperCard({ paper, cat, lang = 'ja', animDelay = 0, cita
             </div>
           ))}
 
-          {(lang === 'ja' ? (paper.abstractJa || paper.abstract) : (paper.abstract || paper.abstractJa)) && (
+          {abstract && (
             <div style={{ borderTop: `1px solid ${cat.color}10`, padding: '11px 18px' }}>
               <div style={{ fontSize: 11, color: '#475569', fontWeight: 600, letterSpacing: 1.5, marginBottom: 6 }}>
                 {copy.abstract}
               </div>
               <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.9,
                 paddingLeft: 8, borderLeft: '2px solid #38bdf840' }}>
-                {lang === 'ja' ? (paper.abstractJa || paper.abstract) : (paper.abstract || paper.abstractJa)}
+                {abstract}
               </div>
             </div>
           )}

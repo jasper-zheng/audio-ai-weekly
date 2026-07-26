@@ -1,21 +1,17 @@
-import { t } from '../i18n.js'
+import { localized, t } from '../i18n.js'
 
 export default function FeatureSpotlight({ feature, lang = 'ja' }) {
   if (!feature?.slug) return null
 
   const copy = t(lang)
-  const title = lang === 'en'
-    ? (feature.titleEn || feature.title)
-    : (feature.title || feature.titleEn)
-  const dek = lang === 'en'
-    ? (feature.dekEn || feature.dek)
-    : (feature.dek || feature.dekEn)
+  const title = localized(feature, 'title', lang)
+  const dek = localized(feature, 'dek', lang)
   const type = copy.featureTypes[feature.type] || feature.type
-  const readTime = lang === 'en'
-    ? (feature.readTimeMinutesEn || feature.readTimeMinutes)
-    : feature.readTimeMinutes
-  const articleHref = `./features/${encodeURIComponent(feature.slug)}/${lang === 'en' ? 'en/' : ''}`
-  const archiveHref = lang === 'en' ? './features/en/' : './features/'
+  const readTime = localized(feature, 'readTimeMinutes', lang)
+  // Japanese is the default edition and lives at the article root.
+  const languageDir = lang === 'ja' ? '' : `${lang}/`
+  const articleHref = `./features/${encodeURIComponent(feature.slug)}/${languageDir}`
+  const archiveHref = `./features/${languageDir}`
 
   return (
     <section className="feature-spotlight fd" aria-labelledby={`feature-${feature.slug}`}>

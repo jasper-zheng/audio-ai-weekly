@@ -17,15 +17,26 @@ human fact-checking.
 
 ## Display language and data schema
 
-The web UI supports Japanese and English. `?lang=ja|en` takes precedence over the
-saved `arxiv-language` value, which in turn takes precedence over the browser
-language. Changing the header's `JA / EN` control updates both the URL and saved
-preference without resetting other filters.
+The web UI supports Japanese, English, and Simplified Chinese. `?lang=ja|en|zh`
+takes precedence over the saved `arxiv-language` value, which in turn takes
+precedence over the browser language. Changing the header's `JA / EN / ZH` control
+updates both the URL and saved preference without resetting other filters.
 
-Category objects contain `label` (Japanese) and `labelEn`. Paper analysis keeps
-the Japanese fields and adds `taskEn`, `whatEn`, `novelEn`, `methodEn`,
-`validationEn`, and `discussionEn`; the original `title` and `abstract` supply
-English title and abstract copy. Weekly data contains `trend` and `trendEn`.
+Fields follow a suffix convention defined once in `scripts/languages.py` and
+mirrored in `web/src/i18n.js`: Japanese is the unsuffixed base field, English is
+`*En`, and Chinese is `*Zh`. So category objects contain `label`, `labelEn`, and
+`labelZh`, and paper analysis carries `task`/`taskEn`/`taskZh` and the same triple
+for `what`, `novel`, `method`, `validation`, and `discussion`. Weekly data contains
+`trend`, `trendEn`, and `trendZh`.
+
+Two paper fields invert this, because their base value is the raw arXiv text
+rather than a translation: `title` and `abstract` hold the original English, with
+translations in `titleJa`/`titleZh` and `abstractJa`/`abstractZh`.
+
+Missing translations are omitted rather than written empty, and the UI falls back
+along `zh → en → ja`, so a record that predates a language still renders. The
+document language is set to a BCP-47 tag (`zh-Hans` for Chinese) because no CJK
+webfont is loaded and browsers pick Han glyph variants from it.
 
 ## Twice-monthly deep-dive features
 
@@ -37,11 +48,16 @@ features each month:
 - the fourth Tuesday: a debate brief comparing competing approaches, evaluation
   assumptions, and implications for researchers and practitioners.
 
-Each feature publishes matched full-length English and Japanese editions. The
-generator first writes an 800–1,100 word canonical English article, verifies its
-grounding, and only then translates the fixed section, block, and citation structure
-into a Japanese 8–12 minute read. A separate bilingual review rejects material
-omissions, additions, or changed qualifications. Topic selection starts from the
+Each feature publishes matched full-length English, Japanese, and Simplified
+Chinese editions. The generator first writes an 800–1,100 word canonical English
+article and verifies its grounding. Only then does it translate the fixed section,
+block, and citation structure into each target language listed in
+`features.translation_target_languages` — a Japanese 8–12 minute read and a Chinese
+one of the same length. Each language runs its own translate-and-verify leg against
+the same verified English body, so the legs are independent and a fourth language
+is a config block plus a prompt pair. A separate bilingual review per language
+rejects material omissions, additions, or changed qualifications. Topic selection
+starts from the
 recent weekly archive, then retrieves additional arXiv primary sources for
 historical context. The generator uses only the supplied paper metadata and
 abstracts for factual claims. Validated HTTPS code and project URLs already present
@@ -49,19 +65,26 @@ in weekly metadata are shown as metadata-linked reading resources; they are not
 treated as independent evidence or endorsed as official by the publisher.
 
 Publication is fail-closed. A feature must pass structural checks for article
-length and reading time, Japanese/English language checks, source coverage, one
+length and reading time, per-language script checks, source coverage, one
 metadata-linked resource, three distinct perspectives, and block-level citations,
 followed by separate grounding and translation-fidelity reviews. Bounded correction
 attempts are allowed; if either review still fails, that publication slot is
 skipped. Generated feature JSON is stored under `data/features/`, and
-`scripts/render_features.py` turns it into shareable Japanese and English static
-pages under `/features/<slug>/` and `/features/<slug>/en/`.
+`scripts/render_features.py` turns it into shareable static pages under
+`/features/<slug>/` (Japanese, the canonical URL), `/features/<slug>/en/`, and
+`/features/<slug>/zh/`.
+
+Japanese and Chinese share the Han script, so a character-class check alone cannot
+tell them apart. The script gate keys on kana instead: Chinese never uses it, so a
+kana ratio above `features.chinese_kana_max_ratio` in a `*Zh` field means the model
+returned Japanese. The reverse check is deliberately not applied — requiring kana in
+Japanese would reject legitimate kana-free kanji compounds.
 
 ## Research Areas
 
 - Audio foundation models
-- Source separation
-- Anomalous sound detection
+- Audio generation
+- Neural audio codecs
 
 ## Setup
 
@@ -122,6 +145,14 @@ Actions, add `GEMINI_API_KEY` under **Settings → Secrets and variables → Act
 ## Adding or Removing Keywords
 
 Edit the `include` list in `config/keywords.yaml`. No code changes are required.
+
+Matching is plain case-insensitive substring containment over the title and
+abstract, so keywords must not carry surrounding whitespace: a trailing space makes
+`sound generation ` miss `Sound generation.` entirely.
+
+Adding a **category** to `ui_categories` does require a label per UI language —
+`label`, `labelEn`, and `labelZh` — otherwise `scripts/build_data.py` raises a
+`KeyError` while projecting the category definitions.
 
 ## Repository Structure
 

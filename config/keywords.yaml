@@ -20,22 +20,18 @@ include:
   - audio pre-training
   - audio self-supervised
   - universal audio
-  # Source separation
-  - source separation
-  - music separation
-  - speech separation
-  - sound separation
-  - speaker separation
-  - vocal separation
-  - music demixing
-  # Anomalous sound detection
-  - anomalous sound detection
-  - anomaly sound detection
-  - anomaly detection
-  - acoustic anomaly
-  - machine sound anomaly
-  - unsupervised anomaly
-  - sound event detection
+  # Audio generative models
+  - audio generative model
+  - audio generation
+  - audio synthesis
+  - music generation
+  - music synthesis
+  - sound generation
+  - sound synthesis
+  # Neural audio codec
+  - neural audio codec
+  - neural audio compression
+  - audio autoencoder
 
 # Exclusion keywords override include matches.
 exclude:
@@ -47,6 +43,7 @@ ui_categories:
   - id: foundation
     label: 音の基盤モデル
     labelEn: Audio Foundation Models
+    labelZh: 音频基础模型
     color: "#38bdf8"
     keywords:
       - audio foundation model
@@ -58,28 +55,26 @@ ui_categories:
       - audio self-supervised
       - universal audio
 
-  - id: separation
-    label: 音源分離
-    labelEn: Source Separation
+  - id: generation
+    label: 音声生成
+    labelEn: Audio Generation
+    labelZh: 音频生成
     color: "#4ade80"
     keywords:
-      - source separation
-      - music separation
-      - speech separation
-      - sound separation
-      - speaker separation
-      - vocal separation
-      - music demixing
+      - audio generative model
+      - audio generation
+      - audio synthesis
+      - music generation
+      - music synthesis
+      - sound generation
+      - sound synthesis
 
-  - id: anomaly
-    label: 異音検知
-    labelEn: Anomalous Sound Detection
+  - id: codec
+    label: 音声コーデック
+    labelEn: Audio Codec
+    labelZh: 音频编解码
     color: "#fb923c"
     keywords:
-      - anomalous sound detection
-      - anomaly sound detection
-      - anomaly detection
-      - acoustic anomaly
-      - machine sound anomaly
-      - unsupervised anomaly
-      - sound event detection
+      - neural audio codec
+      - neural audio compression
+      - audio autoencoder

@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 from openai import OpenAI
 
+from languages import LANGUAGES, field
 from model_utils import build_chat_kwargs, create_client, get_ai_config
 
 ROOT = Path(__file__).parent.parent
@@ -23,9 +24,20 @@ METADATA_SETTINGS = SETTINGS["metadata"]
 TREND_PROMPT = (ROOT / "config/prompts/trend.txt").read_text().strip().replace(
     "{line_count}", str(ANALYSIS_SETTINGS["trend_line_count"])
 )
+EMPTY_TREND_TEXT = {
+    "ja": "トレンド情報なし",
+    "en": "No trend information",
+    "zh": "暂无趋势信息",
+}
+OTHER_CATEGORY_LABELS = {"ja": "その他", "en": "Other", "zh": "其他"}
 
 
-def generate_trend(client: OpenAI, papers: list[dict]) -> tuple[list[str], list[str]]:
+def category_labels(source: dict) -> dict:
+    """Project a keywords.yaml category onto the per-language label fields."""
+    return {field("label", language): source[field("label", language)] for language in LANGUAGES}
+
+
+def generate_trend(client: OpenAI, papers: list[dict]) -> dict[str, list[str]]:
     _, cfg = get_ai_config(SETTINGS)
     summaries = "\n".join(
         f"- {p['title']}: {p.get('whatEn') or p.get('what') or p.get('abstract', '')}"
@@ -58,39 +70,58 @@ def generate_trend(client: OpenAI, papers: list[dict]) -> tuple[list[str], list[
             raw = raw.lstrip("```json").lstrip("```").rstrip("```").strip()
             result = json.loads(raw)
             if isinstance(result, dict):
-                ja, en = result.get("ja"), result.get("en")
-                if (isinstance(ja, list) and isinstance(en, list)
-                        and len(ja) == ANALYSIS_SETTINGS["trend_line_count"]
-                        and len(en) == ANALYSIS_SETTINGS["trend_line_count"]
-                        and all(isinstance(line, str) for line in ja + en)):
-                    return ja, en
+                # Require every configured language. Accepting a partial response
+                # would silently publish a week with one language missing, which
+                # the retry loop below is there to prevent.
+                lines = {
+                    language: result.get(language)
+                    for language in LANGUAGES
+                }
+                if all(
+                    isinstance(value, list)
+                    and len(value) == ANALYSIS_SETTINGS["trend_line_count"]
+                    and all(isinstance(line, str) for line in value)
+                    for value in lines.values()
+                ):
+                    return lines
             # Accept the legacy response shape so transient model deviations remain usable.
             if (isinstance(result, list)
                     and len(result) == ANALYSIS_SETTINGS["trend_line_count"]
                     and all(isinstance(line, str) for line in result)):
-                return result, []
+                return {"ja": result}
             raise ValueError("trend response does not match the expected JSON shape")
         except Exception as e:
             last_request_at = request_started_at
             print(f"  [warn] trend generation error (attempt {attempt + 1}): {e}")
-    return [], []
+    return {}
 
 
-def empty_trend() -> list[str]:
-    """Return a localized placeholder with the configured number of lines."""
-    return ["トレンド情報なし"] * ANALYSIS_SETTINGS["trend_line_count"]
+def empty_trend() -> dict[str, list[str]]:
+    """Return localized placeholders with the configured number of lines."""
+    return {
+        language: [EMPTY_TREND_TEXT[language]] * ANALYSIS_SETTINGS["trend_line_count"]
+        for language in LANGUAGES
+    }
+
+
+def trend_fields(trend: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Map per-language trend lines onto their output field names."""
+    return {
+        field("trend", language): lines
+        for language, lines in trend.items()
+        if lines
+    }
 
 
 def group_by_category(papers: list[dict]) -> list[dict]:
     ui_cats = KEYWORDS["ui_categories"]
     cat_map = {
-        c["id"]: {"id": c["id"], "label": c["label"], "labelEn": c["labelEn"], "color": c["color"], "papers": []}
+        c["id"]: {"id": c["id"], **category_labels(c), "color": c["color"], "papers": []}
         for c in ui_cats
     }
     cat_map["other"] = {
         "id": "other",
-        "label": "その他",
-        "labelEn": "Other",
+        **{field("label", language): OTHER_CATEGORY_LABELS[language] for language in LANGUAGES},
         "color": "#94a3b8",
         "papers": [],
     }
@@ -196,8 +227,8 @@ def main(date_str: str | None = None):
     provider, cfg = get_ai_config(SETTINGS)
     try:
         client = create_client(SETTINGS)
-        trend, trend_en = generate_trend(client, papers)
-        if not trend:
+        trend = generate_trend(client, papers)
+        if not trend.get("ja"):
             trend = empty_trend()
     except EnvironmentError:
         print(
@@ -205,7 +236,6 @@ def main(date_str: str | None = None):
             "skipping trend generation."
         )
         trend = empty_trend()
-        trend_en = []
 
     # Group papers by category.
     categories = group_by_category(papers)
@@ -215,10 +245,8 @@ def main(date_str: str | None = None):
         "generated_at": now.isoformat(),
         "total": len(papers),
         "categories": categories,
-        "trend": trend,
+        **trend_fields(trend),
     }
-    if trend_en:
-        weekly_data["trendEn"] = trend_en
 
     # Save the weekly file.
     weekly_path.parent.mkdir(parents=True, exist_ok=True)
@@ -239,7 +267,7 @@ def main(date_str: str | None = None):
     )
     # Always write the latest category definitions from keywords.yaml.
     index["categories"] = [
-        {"id": c["id"], "label": c["label"], "labelEn": c["labelEn"], "color": c["color"]}
+        {"id": c["id"], **category_labels(c), "color": c["color"]}
         for c in KEYWORDS["ui_categories"]
     ]
     save_index(index)

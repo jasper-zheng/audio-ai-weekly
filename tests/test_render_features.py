@@ -52,12 +52,16 @@ def make_feature():
                 "id": section_id,
                 "heading": f"節 {index + 1}",
                 "headingEn": f"Section {index + 1}",
+                "headingZh": f"第 {index + 1} 节",
                 "blocks": [
                     {
                         "id": f"block-{index + 1}",
                         "text": ("本文" * 260)
                         + " <script>alert(1)</script> & analysis",
                         "textEn": " ".join(["evidence"] * 200),
+                        # 6 x 404 = 2424 non-whitespace characters, so
+                        # ceil(2424 / 270) == 9 minutes, inside the 8-12 band.
+                        "textZh": "正文" * 202,
                         "sourceIds": source_ids,
                     }
                 ],
@@ -74,12 +78,15 @@ def make_feature():
         "searchTerms": ["source separation"],
         "title": "音源分離 <script>",
         "titleEn": "Source Separation <script>",
+        "titleZh": "音频分离 <script>",
         "dek": "一次資料から読む & 考える。",
         "dekEn": "A primary-source feature.",
+        "dekZh": "从一次文献出发的专题解读。",
         "summaryEn": "A concise English summary.",
         "keyPointsEn": ["One", "Two", "Three"],
         "readTimeMinutes": 8,
         "readTimeMinutesEn": 6,
+        "readTimeMinutesZh": 9,
         "perspectives": [
             {
                 "id": "metrics",
@@ -87,6 +94,8 @@ def make_feature():
                 "description": "指標の視点",
                 "labelEn": "Metrics",
                 "descriptionEn": "The metrics perspective.",
+                "labelZh": "指标",
+                "descriptionZh": "指标视角。",
                 "sourceIds": ["S1"],
             },
             {
@@ -95,6 +104,8 @@ def make_feature():
                 "description": "データの視点",
                 "labelEn": "Data",
                 "descriptionEn": "The data perspective.",
+                "labelZh": "数据",
+                "descriptionZh": "数据视角。",
                 "sourceIds": ["S2"],
             },
             {
@@ -103,15 +114,16 @@ def make_feature():
                 "description": "利用の視点",
                 "labelEn": "Use",
                 "descriptionEn": "The practitioner perspective.",
+                "labelZh": "应用",
+                "descriptionZh": "实践者视角。",
                 "sourceIds": ["S3"],
             },
         ],
         "sections": sections,
         "sources": sources,
-        "translation": {
-            "targetLanguage": "ja",
-            "status": "passed",
-            "revisionCount": 0,
+        "translations": {
+            "ja": {"status": "passed", "revisionCount": 0},
+            "zh": {"status": "passed", "revisionCount": 0},
         },
         "verification": {"status": "passed", "revisionCount": 0},
     }
@@ -140,36 +152,32 @@ def write_feature_data(input_dir, feature):
 def test_missing_index_renders_empty_archive_placeholder(tmp_path):
     output = tmp_path / "public" / "features"
     written = render_features.render_all(tmp_path / "missing-features", output)
-    assert written == [output / "index.html", output / "en" / "index.html"]
+    assert written == [
+        output / "index.html",
+        output / "zh" / "index.html",
+        output / "en" / "index.html",
+    ]
     japanese = (output / "index.html").read_text()
+    chinese = (output / "zh" / "index.html").read_text()
     english = (output / "en" / "index.html").read_text()
     assert "公開済みの特集はまだありません" in japanese
+    assert "尚未发布任何专题" in chinese
     assert "No features have been published yet" in english
     assert "radial-gradient" not in japanese
 
 
-def test_renderer_keeps_legacy_english_summary_compatible(tmp_path):
+def test_renderer_refuses_a_feature_missing_a_full_edition(tmp_path):
+    """Every published feature must carry all editions; there is no summary-only mode."""
     input_dir = tmp_path / "data" / "features"
     output_dir = tmp_path / "public" / "features"
     feature = make_feature()
-    feature.pop("sourceLanguage")
-    feature.pop("translation")
-    feature.pop("readTimeMinutesEn")
-    for perspective in feature["perspectives"]:
-        perspective.pop("labelEn")
-        perspective.pop("descriptionEn")
     for section in feature["sections"]:
-        section.pop("headingEn")
         for block in section["blocks"]:
-            block.pop("textEn")
+            block.pop("textZh")
     write_feature_data(input_dir, feature)
 
-    render_features.render_all(input_dir, output_dir)
-
-    english = (output_dir / feature["slug"] / "en" / "index.html").read_text()
-    assert "English summary" in english
-    assert feature["summaryEn"] in english
-    assert "This summary is grounded" in english
+    with pytest.raises(render_features.RenderError, match="textZh"):
+        render_features.render_all(input_dir, output_dir)
 
 
 def test_render_all_writes_escaped_article_archive_seo_and_primary_links(tmp_path):
@@ -196,6 +204,9 @@ def test_render_all_writes_escaped_article_archive_seo_and_primary_links(tmp_pat
     assert f'rel="canonical" href="https://example.test/site/features/{feature["slug"]}/en/"' in english
     assert 'hreflang="ja"' in japanese
     assert 'hreflang="en"' in japanese
+    # Chinese needs the script subtag so browsers pick Simplified glyphs.
+    assert 'hreflang="zh-Hans"' in japanese
+    assert 'hreflang="x-default"' in japanese
     assert 'type="application/ld+json"' in japanese
     assert "\\u003cscript\\u003e" in japanese
     assert "\\u003cscript\\u003e" in english
@@ -226,12 +237,40 @@ def test_render_all_writes_escaped_article_archive_seo_and_primary_links(tmp_pat
     assert "IBM Plex Mono" in japanese
     assert "radial-gradient" not in japanese
 
+    chinese_path = output_dir / feature["slug"] / "zh" / "index.html"
+    assert chinese_path in written
+    chinese = chinese_path.read_text()
+    assert '<html lang="zh-Hans">' in chinese
+    assert (
+        f'rel="canonical" href="https://example.test/site/features/{feature["slug"]}/zh/"'
+        in chinese
+    )
+    assert "音频分离 &lt;script&gt;" in chinese
+    assert "<script>alert(1)</script>" not in chinese
+    assert feature["sections"][0]["blocks"][0]["textZh"] in chinese
+    assert feature["perspectives"][0]["labelZh"] in chinese
+    assert feature["sections"][0]["headingZh"] in chinese
+    # No cross-language bleed into the Chinese page.
+    assert feature["sections"][0]["blocks"][0]["text"] not in chinese
+    assert feature["sections"][0]["blocks"][0]["textEn"] not in chinese
+    assert feature["dek"] not in chinese
+    assert feature["dekEn"] not in chinese
+    assert "领域解读" in chinese
+    assert "一次文献（原标题）" in chinese
+    assert "相关资源：" in chinese
+    assert ">代码</a>" in chinese
+    assert render_features.ARXIV_ACKNOWLEDGEMENT in chinese
+
     japanese_archive = (output_dir / "index.html").read_text()
     english_archive = (output_dir / "en" / "index.html").read_text()
+    chinese_archive = (output_dir / "zh" / "index.html").read_text()
     assert f'./{feature["slug"]}/' in japanese_archive
     assert f'../{feature["slug"]}/en/' in english_archive
+    assert f'../{feature["slug"]}/zh/' in chinese_archive
     assert "音源分離 &lt;script&gt;" in japanese_archive
     assert "Source Separation &lt;script&gt;" not in japanese_archive
+    assert "音频分离 &lt;script&gt;" in chinese_archive
+    assert "专题" in chinese_archive
     assert "Source Separation &lt;script&gt;" in english_archive
     assert "音源分離 &lt;script&gt;" not in english_archive
     assert render_features.ARXIV_ACKNOWLEDGEMENT in japanese_archive
@@ -310,6 +349,46 @@ def test_renderer_recomputes_body_length_language_and_read_time(tmp_path):
     input_dir = tmp_path / "wrong-read-time"
     write_feature_data(input_dir, feature)
     with pytest.raises(render_features.RenderError, match="readTimeMinutes must be 8"):
+        render_features.load_features(input_dir)
+
+    feature = make_feature()
+    for section in feature["sections"]:
+        section["blocks"][0]["textZh"] = "简短正文"
+    input_dir = tmp_path / "short-chinese-body"
+    write_feature_data(input_dir, feature)
+    with pytest.raises(
+        render_features.RenderError, match="Simplified Chinese body must contain"
+    ):
+        render_features.load_features(input_dir)
+
+    # Han is shared between the scripts, so kana is what proves a Chinese block
+    # is actually Japanese. Without the kana check this passes every gate.
+    feature = make_feature()
+    for section in feature["sections"]:
+        section["blocks"][0]["textZh"] = "日本語だけの本文です" * 41
+    input_dir = tmp_path / "japanese-chinese-edition"
+    write_feature_data(input_dir, feature)
+    with pytest.raises(
+        render_features.RenderError, match="textZh.*Simplified Chinese"
+    ):
+        render_features.load_features(input_dir)
+
+    feature = make_feature()
+    feature["titleZh"] = "音源分離の評価について"
+    input_dir = tmp_path / "japanese-chinese-title"
+    write_feature_data(input_dir, feature)
+    with pytest.raises(
+        render_features.RenderError, match="titleZh must be predominantly"
+    ):
+        render_features.load_features(input_dir)
+
+    feature = make_feature()
+    feature["readTimeMinutesZh"] = 11
+    input_dir = tmp_path / "wrong-chinese-read-time"
+    write_feature_data(input_dir, feature)
+    with pytest.raises(
+        render_features.RenderError, match="readTimeMinutesZh must be 9"
+    ):
         render_features.load_features(input_dir)
 
 

@@ -3,18 +3,26 @@ Analyze the papers below and respond with a JSON object only, without Markdown c
 {
   "<paper_id>": {
     "abstractJa": "Complete natural Japanese abstract translation",
-    "task": "One- or two-word Japanese task classification, such as TTS, ASR, 音源分離, 異音検知, or 音楽生成",
+    "abstractZh": "Complete natural Simplified Chinese abstract translation",
+    "titleZh": "Natural Simplified Chinese title translation",
+    "task": "One- or two-word Japanese task classification, such as TTS, ASR, 音声生成, 音楽生成, or ニューラル音声コーデック",
     "taskEn": "Equivalent one- or two-word English task classification",
+    "taskZh": "Equivalent one- or two-word Simplified Chinese task classification, such as 音频生成, 音乐生成, or 音频编解码",
     "proposedMethod": "Named method or abbreviation, or null",
     "datasets": ["Dataset name 1", "Dataset name 2"],
     "whatEn": "One- or two-sentence English overview",
+    "whatZh": "One- or two-sentence Simplified Chinese overview",
     "novelEn": "One- or two-sentence English novelty summary",
+    "novelZh": "One- or two-sentence Simplified Chinese novelty summary",
     "methodEn": "One- or two-sentence English technical summary",
+    "methodZh": "One- or two-sentence Simplified Chinese technical summary",
     "validationEn": "One- or two-sentence English validation summary",
-    "discussionEn": "One- or two-sentence English limitations summary"
+    "validationZh": "One- or two-sentence Simplified Chinese validation summary",
+    "discussionEn": "One- or two-sentence English limitations summary",
+    "discussionZh": "One- or two-sentence Simplified Chinese limitations summary"
   }
 }
 
-List up to five datasets. Write task in Japanese and every field ending in En in English.
+List up to five datasets. Write task in Japanese, every field ending in En in English, and every field ending in Zh in Simplified Chinese. Never write Japanese kana in a Zh field.
 
 {{papers}}

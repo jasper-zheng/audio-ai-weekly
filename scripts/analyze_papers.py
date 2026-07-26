@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 analyze_papers.py
-Analyze each paper in Japanese from six perspectives using the configured AI provider.
+Analyze each paper from six perspectives in every configured language using the
+configured AI provider. One request returns all languages for a batch of papers.
 """
 
 import json
@@ -13,6 +14,7 @@ from pathlib import Path
 import yaml
 from openai import APIError, OpenAI
 
+from languages import LANGUAGES, field, source_field
 from model_utils import build_chat_kwargs, create_client, get_ai_config
 from fetch_papers import fetch_arxiv_ids
 
@@ -22,6 +24,22 @@ ANALYSIS_SETTINGS = SETTINGS["analysis"]
 PROMPT_DIR = ROOT / "config" / "prompts"
 SYSTEM_PROMPT = (PROMPT_DIR / "analyze_system.txt").read_text().strip()
 BATCH_PROMPT_TEMPLATE = (PROMPT_DIR / "analyze_batch.txt").read_text().strip()
+
+# Six-perspective prose written by the AI, keyed off the Japanese base field.
+PROSE_FIELDS = ("task", "what", "novel", "method", "validation", "discussion")
+# Every field that is a translation rather than raw arXiv text. Empty values are
+# dropped from the output so a record predating a language remains valid.
+TRANSLATED_FIELDS = tuple(
+    field(base, language)
+    for base in PROSE_FIELDS
+    for language in LANGUAGES
+    if language != "ja"
+) + tuple(
+    source_field(base, language)
+    for base in ("title", "abstract")
+    for language in LANGUAGES
+    if language != "en"
+)
 
 
 def get_client(provider: str | None = None) -> OpenAI:
@@ -287,6 +305,7 @@ def main():
                     "date": paper["date"],
                     "title": paper["title"],
                     "titleJa": result.get("titleJa", paper["title"]),
+                    "titleZh": result.get("titleZh") or "",
                     "authors": paper.get("authors", []),
                     "org": org,
                     "orgSource": org_source,
@@ -298,25 +317,34 @@ def main():
                     "category": paper.get("category", "other"),
                     "task": result.get("task"),
                     "taskEn": result.get("taskEn") or None,
+                    "taskZh": result.get("taskZh") or None,
                     "proposedMethod": result.get("proposedMethod"),
                     "datasets": result.get("datasets", []),
                     "what": result.get("what", ""),
                     "whatEn": result.get("whatEn") or "",
+                    "whatZh": result.get("whatZh") or "",
                     "novel": result.get("novel", ""),
                     "novelEn": result.get("novelEn") or "",
+                    "novelZh": result.get("novelZh") or "",
                     "method": result.get("method", ""),
                     "methodEn": result.get("methodEn") or "",
+                    "methodZh": result.get("methodZh") or "",
                     "validation": result.get("validation", ""),
                     "validationEn": result.get("validationEn") or "",
+                    "validationZh": result.get("validationZh") or "",
                     "discussion": result.get("discussion", ""),
                     "discussionEn": result.get("discussionEn") or "",
+                    "discussionZh": result.get("discussionZh") or "",
                     "abstractJa": result.get("abstractJa", ""),
+                    "abstractZh": result.get("abstractZh", ""),
                     "nextReads": [],
                 }
             )
-            for field in ("taskEn", "whatEn", "novelEn", "methodEn", "validationEn", "discussionEn"):
-                if not analyzed[-1].get(field):
-                    analyzed[-1].pop(field, None)
+            # Drop empty translations so records predating a language stay valid
+            # and the frontend falls back instead of rendering a blank section.
+            for name in TRANSLATED_FIELDS:
+                if not analyzed[-1].get(name):
+                    analyzed[-1].pop(name, None)
 
     verified_next_reads = verify_related_papers(next_read_candidates)
     for paper in analyzed:

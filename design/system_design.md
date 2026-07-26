@@ -25,8 +25,8 @@
 ### 1.1 背景と目的
 
 - arXiv cs.SD・eess.AS には週 100 件超の論文が投稿されており、手動での全量確認は困難
-- 音の基盤モデル・音源分離・異音検知の 3 分野に特化した週次サマリーを自動生成・公開する
-- GitHub Models から提供される Claude を用いて日本語要約（6 観点）を生成する
+- 音の基盤モデル・音声生成・音声コーデックの 3 分野に特化した週次サマリーを自動生成・公開する
+- 設定した AI プロバイダを用いて日本語・英語・簡体字中国語の要約（6 観点）を 1 回の呼び出しで生成する
 - 過去の週次データをすべて保持し、UI 上で任意の週を参照できるようにする
 
 ### 1.2 システム名称
@@ -36,7 +36,7 @@ Audio AI Weekly / 音響AI週報
 ### 1.3 対象ユーザー
 
 - 音声・音響 AI 研究者・エンジニア
-- 音の基盤モデル / 音源分離 / 異音検知に関心を持つ実務者
+- 音の基盤モデル / 音声生成 / 音声コーデックに関心を持つ実務者
 
 ---
 
@@ -196,9 +196,10 @@ audio-ai-weekly/
 | `include` | `string[]` | フィルタリングキーワード（OR 条件）。タイトル・アブストに対してマッチ |
 | `exclude` | `string[]` | 除外キーワード（任意）|
 | `categories` | `string[]` | 対象 arXiv カテゴリ（例: cs.SD, eess.AS） |
-| `ui_categories` | `object[]` | UI 表示用カテゴリ定義（id / label / color / keywords） |
+| `ui_categories` | `object[]` | UI 表示用カテゴリ定義（id / label / labelEn / labelZh / color / keywords）。UI 言語ごとのラベルは必須 |
 
-> 例）「異常音検知」の研究が増えた場合は `include` に `'anomalous sound'` を追記するだけでフィルタに反映される。
+> 例）「ニューラル音声コーデック」の研究が増えた場合は `include` に `'neural audio codec'` を追記するだけでフィルタに反映される。
+> マッチは大文字小文字を無視した部分一致なので、キーワードの前後に空白を含めてはならない。
 
 #### 3.4.2 config/settings.yaml
 
@@ -266,7 +267,7 @@ audio-ai-weekly/
 | `App.jsx` | データ取得・週セレクター・カテゴリフィルター状態管理 |
 | `Header.jsx` | タイトル・日付・論文数 |
 | `WeekSelector.jsx` | ★ 週一覧ドロップダウン。`index.json` から週リストを生成 |
-| `CategoryFilter.jsx` | カテゴリタブ（すべて / 音の基盤モデル / 音源分離 / 異音検知） |
+| `CategoryFilter.jsx` | カテゴリタブ（すべて / 音の基盤モデル / 音声生成 / 音声コーデック）。ラベルは表示言語に応じて `label` / `labelEn` / `labelZh` を選択 |
 | `PaperCard.jsx` | 論文カード。ヘッダークリックで 6 観点を一括展開 |
 | `TrendSummary.jsx` | 今週のトレンド 3 行 |
 
@@ -292,9 +293,21 @@ audio-ai-weekly/
       "generated_at": "2026-04-25T12:00:00Z"
     }
   ],
+  "categories": [
+    {
+      "id": "foundation",
+      "label": "音の基盤モデル",
+      "labelEn": "Audio Foundation Models",
+      "labelZh": "音频基础模型",
+      "color": "#38bdf8"
+    }
+  ],
   "generated_at": "2026-04-25T12:05:00Z"
 }
 ```
+
+> `categories` は `config/keywords.yaml` の `ui_categories` から毎ビルド時に上書きされる。
+> 週次ファイル側のラベルはビルド時点のコピーなので、UI は index 側の定義を優先する。
 
 #### data/weekly/YYYY-MMDD.json
 
@@ -307,6 +320,8 @@ audio-ai-weekly/
     {
       "id": "foundation",
       "label": "音の基盤モデル",
+      "labelEn": "Audio Foundation Models",
+      "labelZh": "音频基础模型",
       "color": "#38bdf8",
       "papers": [
         {
@@ -314,13 +329,17 @@ audio-ai-weekly/
           "date": "Apr 15",
           "title": "...",
           "titleJa": "...",
+          "titleZh": "...",
+          "abstract": "...",
+          "abstractJa": "...",
+          "abstractZh": "...",
           "org": "NVIDIA / UMD",
           "url": "https://arxiv.org/abs/2604.10905",
-          "what": "...",
-          "novel": "...",
-          "method": "...",
-          "validation": "...",
-          "discussion": "...",
+          "what": "...", "whatEn": "...", "whatZh": "...",
+          "novel": "...", "novelEn": "...", "novelZh": "...",
+          "method": "...", "methodEn": "...", "methodZh": "...",
+          "validation": "...", "validationEn": "...", "validationZh": "...",
+          "discussion": "...", "discussionEn": "...", "discussionZh": "...",
           "nextReads": [
             { "label": "Qwen-Audio (2023)", "url": "https://arxiv.org/abs/2311.07919" }
           ]
@@ -328,13 +347,17 @@ audio-ai-weekly/
       ]
     }
   ],
-  "trend": [
-    "① 音の基盤モデルは...",
-    "② 音源分離は...",
-    "③ 異音検知は..."
-  ]
+  "trend":   ["① 音の基盤モデルは...", "② 音声生成は...", "③ 音声コーデックは..."],
+  "trendEn": ["...", "...", "..."],
+  "trendZh": ["...", "...", "..."]
 }
 ```
+
+> 命名規則：日本語は無印、英語は `*En`、簡体字中国語は `*Zh`。
+> ただし `title` / `abstract` は arXiv 原文（英語）が無印で、訳文が `titleJa` / `titleZh`
+> および `abstractJa` / `abstractZh` になる。定義は `scripts/languages.py` に集約。
+> 訳が未生成のフィールドは空文字ではなく省略され、UI は `zh → en → ja` の順にフォールバックする。
+> `nextReads` の `label` は原題（英語）のまま翻訳しない。
 
 ---
 

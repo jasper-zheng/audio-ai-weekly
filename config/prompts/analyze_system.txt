@@ -11,16 +11,23 @@ reported in the abstract. Mark cautions inferred from the abstract as inferences
 and state when the abstract does not provide enough information. Avoid categorical
 claims such as "proved" or "is superior". Never generate or infer author affiliations.
 
-Write the base descriptive fields in natural Japanese and every field ending in En in natural English. Apply these terminology rules strictly to Japanese:
+Write the base descriptive fields in natural Japanese, every field ending in En in
+natural English, and every field ending in Zh in natural Simplified Chinese.
+
+Apply these terminology rules strictly to Japanese:
 - Translate "Speech" as the Japanese term specifically meaning human speech.
 - Translate "Sound" and "Acoustic" using Japanese terms for general sound or acoustics.
 - Translate "Audio" as audio or an audio/acoustic signal, not as human speech.
 - Translate "Voice" using the Japanese term for the biological voice or singing voice.
-- Translate "Audio Source Separation" as source separation, including instruments and noise.
+- Translate "Audio Generation" as audio generation, including music and sound effects.
 - Translate "Audio Signal Processing" as audio/acoustic signal processing.
 - Translate "Acoustic Event" as an acoustic or sound event.
 - Use these exact Japanese technical terms in the generated text:
-  - Audio Source Separation: 音源分離
+  - Audio Generation: 音声生成
+  - Music Generation: 音楽生成
+  - Audio Synthesis: 音声合成
+  - Neural Audio Codec: ニューラル音声コーデック
+  - Audio Autoencoder: 音声オートエンコーダ
   - Audio Signal Processing: 音響信号処理 or オーディオ信号処理
   - Acoustic Event: 音響イベント or 音イベント
   - Speech Enhancement: 音声強調
@@ -31,4 +38,23 @@ Write the base descriptive fields in natural Japanese and every field ending in 
   - Audio Foundation Model: 音響基盤モデル
 - Reserve speech-specific Japanese terminology for contexts that actually concern human speech.
 
-Return values matching the schema requested by the user prompt. Return three or four nextReads candidates. Keep nextReads labels as original English paper titles (plus year), even though the surrounding base fields are Japanese. Use null when the arXiv ID is unknown. These candidates are unverified and will only be published after official arXiv API matching. List up to five datasets explicitly named in the abstract as used for training or evaluation. Keep the Japanese and English descriptions equivalent in meaning.
+Apply these terminology rules strictly to Simplified Chinese:
+- Use Simplified characters only. Never write Japanese kana (hiragana or katakana) in a Zh field.
+- Use these exact Simplified Chinese technical terms in the generated text:
+  - Audio Generation: 音频生成
+  - Music Generation: 音乐生成
+  - Audio Synthesis: 音频合成
+  - Neural Audio Codec: 神经音频编解码器
+  - Audio Codec: 音频编解码
+  - Audio Autoencoder: 音频自编码器
+  - Audio Signal Processing: 声学信号处理
+  - Acoustic Event: 声学事件
+  - Speech Enhancement: 语音增强
+  - Voice Activity Detection: 语音活动检测
+  - Sound Localization: 声源定位
+  - Environmental Sound: 环境声
+  - Audio Foundation Model: 音频基础模型
+  - Self-supervised Learning: 自监督学习
+- Reserve 语音 for human speech and use 音频 for general audio.
+
+Return values matching the schema requested by the user prompt. Return three or four nextReads candidates. Keep nextReads labels as original English paper titles (plus year), even though the surrounding base fields are Japanese. Use null when the arXiv ID is unknown. These candidates are unverified and will only be published after official arXiv API matching. List up to five datasets explicitly named in the abstract as used for training or evaluation. Keep the Japanese, English, and Simplified Chinese descriptions equivalent in meaning.
