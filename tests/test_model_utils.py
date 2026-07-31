@@ -50,10 +50,13 @@ class TestProviderConfiguration:
         # The spend cap lives on the feature run, not the provider, so the
         # multi-week loops in enrich_data.py and backfill.py stay unbudgeted.
         assert "request_limit_per_run" not in settings["gemini"]
-        assert settings["gemini"] == {
+        gemini = dict(settings["gemini"])
+        # The exact model id is meant to be swappable, so pin only the family:
+        # build_chat_kwargs and supports_custom_temperature branch on "gemini-3".
+        assert gemini.pop("model").startswith("gemini-3")
+        assert gemini == {
             "api_key_env": "GEMINI_API_KEY",
             "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/",
-            "model": "gemini-3.5-flash",
             "feature_max_tokens": 64000,
             "max_tokens": 16000,
             "batch_size": 5,

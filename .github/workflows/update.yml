@@ -158,6 +158,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+
+      # render_features.py imports yaml to read the per-language feature budgets.
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
       - uses: actions/setup-node@v4
         with:

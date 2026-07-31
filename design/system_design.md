@@ -18,7 +18,7 @@
 > ★ = 変更箇所
 
 > **変更（v1.4）:** GitHub Models が 2026-07-30 に提供終了したため、AI プロバイダを
-> Gemini（`gemini-3.5-flash`、OpenAI 互換エンドポイント）へ移行し、`github_models`
+> Gemini（`gemini-3.5-flash-lite`、OpenAI 互換エンドポイント）へ移行し、`github_models`
 > 設定ブロックを削除しました。認証は `GITHUB_TOKEN` から `GEMINI_API_KEY` に変わり、
 > Secrets への手動登録が必要になります。`GITHUB_TOKEN` は `gh-pages` への公開専用です。
 > 以下の本文中で GitHub Models / `GITHUB_TOKEN` を AI 認証として記述している箇所

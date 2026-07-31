@@ -132,7 +132,7 @@ ai:
 
 Gemini uses its official
 [OpenAI-compatible endpoint](https://ai.google.dev/gemini-api/docs/openai)
-with [`gemini-3.5-flash`](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash),
+with [`gemini-3.5-flash-lite`](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite),
 via the `openai` SDK. Adding a second provider is a new top-level settings block
 plus an entry in `analysis.fallback_providers` and
 `features.model_fallback_providers`; no code change is required.

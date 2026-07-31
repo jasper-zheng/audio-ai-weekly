@@ -958,7 +958,9 @@ def test_feature_model_budgets_cover_reasoning_and_structured_output():
     assert cfg["translation_block_batch_max"] == 3
     assert cfg["arxiv_retry_max"] == 3
     assert cfg["arxiv_retry_max_interval"] >= cfg["arxiv_retry_interval"]
-    assert generate_feature.SETTINGS["gemini"]["model"] == "gemini-3.5-flash"
+    # Family, not exact id: the model is swappable, but "gemini-3" is what
+    # build_chat_kwargs keys on to send reasoning_effort and omit temperature.
+    assert generate_feature.SETTINGS["gemini"]["model"].startswith("gemini-3")
     assert generate_feature.SETTINGS["gemini"]["feature_max_tokens"] >= cfg[
         "model_max_tokens"
     ]
