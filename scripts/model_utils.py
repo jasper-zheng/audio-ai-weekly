@@ -116,10 +116,19 @@ def create_client(
     settings: Mapping,
     environ: Mapping[str, str] | None = None,
     provider: str | None = None,
+    *,
+    request_limit: int | None = None,
 ) -> OpenAI:
-    """Create an OpenAI client for the provider selected in settings."""
+    """Create an OpenAI client for the provider selected in settings.
+
+    ``request_limit`` lets a single entry point cap its own spend without
+    budgeting every other script that shares the provider: the budget is
+    process-wide per (provider, limit), and both enrich_data.py and backfill.py
+    loop over every archived week inside one process.
+    """
     provider, config = get_ai_config(settings, provider)
-    request_limit = config.get("request_limit_per_run")
+    if request_limit is None:
+        request_limit = config.get("request_limit_per_run")
     client_options = {
         "base_url": config["endpoint"],
         "api_key": get_api_key(provider, config, environ),

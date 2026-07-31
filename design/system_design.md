@@ -13,8 +13,16 @@
 | 1.1 | 2026-04-25 | 4項目の要件変更を反映（キーワード管理・50件・GitHub Models・過去データ保持） |
 | 1.2 | 2026-04-25 | 開発環境（DevContainer）節を追加 |
 | 1.3 | 2026-04-25 | JSON ファイル命名規則を YYYY-MMDD 形式に変更 |
+| 1.4 | 2026-07-31 | AI プロバイダを GitHub Models から Gemini へ移行 |
 
 > ★ = 変更箇所
+
+> **変更（v1.4）:** GitHub Models が 2026-07-30 に提供終了したため、AI プロバイダを
+> Gemini（`gemini-3.5-flash`、OpenAI 互換エンドポイント）へ移行し、`github_models`
+> 設定ブロックを削除しました。認証は `GITHUB_TOKEN` から `GEMINI_API_KEY` に変わり、
+> Secrets への手動登録が必要になります。`GITHUB_TOKEN` は `gh-pages` への公開専用です。
+> 以下の本文中で GitHub Models / `GITHUB_TOKEN` を AI 認証として記述している箇所
+> （2.1.2・4章・6章ほか）は v1.3 時点の記録であり、現行の実装は本注記が優先します。
 
 ---
 

@@ -23,7 +23,8 @@
     "github-cli": "echo '🔍 GitHub CLI 認証状態:' && gh auth status 2>&1 || echo '⚠️  gh auth login を実行して認証してください'"
   },
   "remoteEnv": {
-    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
+    "GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}"
   },
   "mounts": [
     "source=arxiv-venv,target=/venv,type=volume",

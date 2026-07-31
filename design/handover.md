@@ -18,7 +18,7 @@
 | プロジェクト名 | Audio AI Weekly / 音響AI週報 / 音频AI周报 |
 | 対象分野 | 音の基盤モデル・音声生成・音声コーデック |
 | 更新頻度 | 毎週金曜日 21:00 JST（GitHub Actions cron） |
-| AI 解析エンジン | `config/settings.yaml` の `ai.provider` で選択（`github_models` / `gemini`）|
+| AI 解析エンジン | Gemini（`config/settings.yaml` の `ai.provider`）。GitHub Models は 2026-07-30 に提供終了 |
 | フロントエンド | React 18 + Vite → GitHub Pages で配信 |
 | データ管理 | 週次 JSON（`YYYY-MMDD.json`）＋ `index.json` で全週保持 |
 | 設計書 | 要件定義書 v1.3（`system_design.md`） |
@@ -80,7 +80,16 @@ Settings → Actions → General
 → Workflow permissions → Read and write permissions → Save
 ```
 
+**☐ `GEMINI_API_KEY` を Secrets に登録する**
+```
+Settings → Secrets and variables → Actions
+→ New repository secret → Name: GEMINI_API_KEY
+```
+
 > `GITHUB_TOKEN` は Actions が自動発行するため、Secrets への手動登録は**不要**です。
+> ただし 2026-07-30 の GitHub Models 提供終了に伴い AI 認証には使われなくなり、
+> 現在は `gh-pages` への公開と自身の実行メタデータ取得のみに使われます。
+> AI 処理には `GEMINI_API_KEY` の手動登録が**必須**です。
 
 ---
 
@@ -112,12 +121,13 @@ https://YOUR_ORG.github.io/audio-ai-weekly/
 
 | 症状 | 原因 | 対処 |
 |---|---|---|
-| analyze ジョブが失敗 | GitHub Models のレート制限 | `settings.yaml` の `retry_interval` を増やす（例: `10.0`） |
+| analyze ジョブが失敗 | Gemini のレート制限 | `settings.yaml` の `gemini.retry_interval` を増やす（例: `10.0`） |
 | deploy ジョブが失敗 | GitHub Pages が未有効 | 3.1 の Pages 設定を実施する |
 | フロントに論文が表示されない | `data/` が `web/public/data/` にコピーされていない | `update.yml` の「Copy data to web/public」ステップを確認 |
 | カテゴリ分類が「その他」になる | `keywords.yaml` のキーワードが論文に一致しない | `include` キーワードを追加・調整する |
 | 週次 JSON がスキップされる | 同一日付のファイルが既に存在する | 正常動作。再実行する場合は `data/weekly/YYYY-MMDD.json` を削除してから実行 |
-| GitHub Models の認証エラー | `GITHUB_TOKEN` の権限不足 | `permissions: contents: write` が `update.yml` に設定されているか確認 |
+| AI プロバイダの認証エラー | `GEMINI_API_KEY` が Secrets に未登録 | 3.1 の手順で登録する。ローカル実行時は `export GEMINI_API_KEY=...` |
+| `RequestLimitExceeded` で特集生成が中断 | 1 回の特集実行の予算上限に到達 | `settings.yaml` の `features.request_limit_per_run` を確認。週次・enrich・backfill には適用されない |
 
 ---
 

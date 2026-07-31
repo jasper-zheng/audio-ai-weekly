@@ -14,7 +14,6 @@ on:
 
 permissions:
   contents: write
-  models: read
 
 concurrency:
   group: github-pages
@@ -27,7 +26,6 @@ jobs:
     timeout-minutes: 360
     permissions:
       contents: write
-      models: read
     steps:
       - uses: actions/checkout@v4
 
@@ -73,7 +71,6 @@ jobs:
 
       - name: Backfill weekly data
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FROM_DATE: ${{ inputs.from_date }}
           TO_DATE: ${{ inputs.to_date }}

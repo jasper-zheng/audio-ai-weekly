@@ -19,11 +19,14 @@ from model_utils import (
 )
 
 
+# A synthetic second provider. GitHub Models was retired on 2026-07-30 and is no
+# longer configured anywhere, but provider selection must stay generic so adding a
+# real second provider remains a config change.
 SETTINGS = {
-    "ai": {"provider": "github_models"},
-    "github_models": {
-        "api_key_env": "GITHUB_TOKEN",
-        "endpoint": "https://models.example/v1",
+    "ai": {"provider": "secondary"},
+    "secondary": {
+        "api_key_env": "SECONDARY_API_KEY",
+        "endpoint": "https://secondary.example/v1",
         "model": "openai/gpt-5",
     },
     "gemini": {
@@ -35,22 +38,22 @@ SETTINGS = {
 
 
 class TestProviderConfiguration:
-    def test_repository_settings_define_both_providers(self):
+    def test_repository_settings_define_the_gemini_provider(self):
         root = Path(__file__).parent.parent
         settings = yaml.safe_load((root / "config/settings.yaml").read_text())
-        # Either provider may be selected; both must stay fully configured.
-        assert settings["ai"]["provider"] in ("gemini", "github_models")
-        assert settings["github_models"]["api_key_env"] == "GITHUB_TOKEN"
-        assert (
-            settings["github_models"]["endpoint"]
-            == "https://models.github.ai/inference"
-        )
-        assert settings["github_models"]["model"] == "openai/gpt-4.1"
+        assert settings["ai"]["provider"] == "gemini"
+        # GitHub Models was fully retired on 2026-07-30; its config must not
+        # return, or ai.provider becomes one edit away from a dead endpoint.
+        assert "github_models" not in settings
+        assert settings["analysis"]["fallback_providers"] == []
+        assert settings["features"]["model_fallback_providers"] == []
+        # The spend cap lives on the feature run, not the provider, so the
+        # multi-week loops in enrich_data.py and backfill.py stay unbudgeted.
+        assert "request_limit_per_run" not in settings["gemini"]
         assert settings["gemini"] == {
             "api_key_env": "GEMINI_API_KEY",
             "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/",
             "model": "gemini-3.5-flash",
-            "request_limit_per_run": 40,
             "feature_max_tokens": 64000,
             "max_tokens": 16000,
             "batch_size": 5,
@@ -60,14 +63,14 @@ class TestProviderConfiguration:
             "retry_interval": 5.0,
         }
 
-    def test_selects_github_models(self):
+    def test_selects_the_configured_provider(self):
         provider, config = get_ai_config(SETTINGS)
-        assert provider == "github_models"
+        assert provider == "secondary"
         assert config["model"] == "openai/gpt-5"
-        assert config["endpoint"] == "https://models.example/v1"
+        assert config["endpoint"] == "https://secondary.example/v1"
         assert (
-            get_api_key(provider, config, {"GITHUB_TOKEN": "github-key"})
-            == "github-key"
+            get_api_key(provider, config, {"SECONDARY_API_KEY": "secondary-key"})
+            == "secondary-key"
         )
 
     def test_selects_gemini(self):
@@ -88,7 +91,7 @@ class TestProviderConfiguration:
 
     def test_missing_key_names_provider_and_environment_variable(self):
         provider, config = get_ai_config(SETTINGS)
-        with pytest.raises(EnvironmentError, match="github_models.*GITHUB_TOKEN"):
+        with pytest.raises(EnvironmentError, match="secondary.*SECONDARY_API_KEY"):
             get_api_key(provider, config, {})
 
     def test_create_client_uses_selected_endpoint_and_key(self, monkeypatch):
@@ -137,12 +140,44 @@ class TestProviderConfiguration:
         assert len(calls) == 2
         assert client_options["max_retries"] == 0
 
+    def test_caller_supplied_request_limit_budgets_an_unbudgeted_provider(
+        self, monkeypatch
+    ):
+        # generate_feature.py caps its own spend while analyze/enrich/backfill,
+        # which share the same provider block, stay unbudgeted.
+        client_options = {}
+
+        class FakeClient:
+            chat = type(
+                "Chat",
+                (),
+                {"completions": type("Completions", (), {"create": lambda self: "ok"})()},
+            )()
+
+        def fake_openai(**kwargs):
+            client_options.update(kwargs)
+            return FakeClient()
+
+        monkeypatch.setattr(model_utils, "OpenAI", fake_openai)
+        monkeypatch.setattr(model_utils, "_REQUEST_BUDGETS", {})
+        settings = {**SETTINGS, "ai": {"provider": "gemini"}}
+        assert "request_limit_per_run" not in settings["gemini"]
+
+        unbudgeted = create_client(settings, {"GEMINI_API_KEY": "secret"})
+        assert not isinstance(unbudgeted, model_utils.BudgetedOpenAI)
+        assert "max_retries" not in client_options
+
+        budgeted = create_client(settings, {"GEMINI_API_KEY": "secret"}, request_limit=7)
+        assert isinstance(budgeted, model_utils.BudgetedOpenAI)
+        assert client_options["max_retries"] == 0
+        assert get_request_budget("gemini", 7).limit == 7
+
     def test_request_budget_is_shared_by_provider_in_one_process(self, monkeypatch):
         monkeypatch.setattr(model_utils, "_REQUEST_BUDGETS", {})
 
         assert get_request_budget("gemini", 20) is get_request_budget("gemini", 20)
         assert get_request_budget("gemini", 20) is not get_request_budget(
-            "github_models", 20
+            "secondary", 20
         )
 
 

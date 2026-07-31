@@ -29,7 +29,9 @@ metadata:
 
 # Analysis and report-generation settings
 analysis:
-  fallback_providers: [github_models]
+  # Gemini is the only configured provider since GitHub Models was retired on
+  # 2026-07-30, so there is nothing to fall back to and analysis fails closed.
+  fallback_providers: []
   prompt_authors: 3
   temperature: 0.3
   enrichment_tokens_per_paper: 800
@@ -108,8 +110,18 @@ features:
   model_retry_max: 6
   model_retry_interval: 15.0
   model_retry_max_interval: 240.0
-  model_fallback_providers: [github_models]
+  # No second provider exists, so the fallback machinery in JsonModel never fires
+  # and model_fallback_after is inert. Both are kept so adding a provider block is
+  # a config change rather than a code change.
+  model_fallback_providers: []
   model_fallback_after: 2
+  # Spend circuit-breaker for a single feature run, NOT a worst-case sizing: one
+  # budget unit is consumed per HTTP attempt (max_retries=0), so model_retry_max
+  # multiplies every logical call. A feature run costs ~11 logical calls on the
+  # happy path with the ja+zh translation legs; 40 leaves room for roughly one
+  # full retry per language. Scoped here rather than on the provider so the
+  # multi-week loops in enrich_data.py and backfill.py stay unbudgeted.
+  request_limit_per_run: 40
   selection_validation_retry_max: 3
   english_generation_validation_retry_max: 3
   translation_retry_max: 3
@@ -132,39 +144,16 @@ backfill:
   interval_days: 7
   week_interval: 90.0
 
-# AI provider selection
+# AI provider selection. GitHub Models was fully retired on 2026-07-30, so gemini
+# is the only provider block; add another block here to make it selectable.
 ai:
-  provider: "github_models"  # "github_models" or "gemini"
-
-# GitHub Models settings
-github_models:
-  api_key_env: "GITHUB_TOKEN"
-  endpoint: "https://models.github.ai/inference"
-  model: "openai/gpt-4.1"
-  feature_max_tokens: 4000
-  feature_topic_candidate_limit: 16
-  feature_linked_candidate_min: 1
-  feature_abstract_max_chars: 1000
-  max_tokens: 1500
-  # Weekly analysis returns ja+en+zh in one response, so a batch of 5 papers no
-  # longer fits in 6000 tokens. Smaller batches keep each response well clear of
-  # the truncation ceiling.
-  batch_size: 3
-  batch_max_tokens: 8000
-  min_request_interval: 60.0
-  retry_max: 3
-  retry_interval: 5.0       # Retry interval in seconds
+  provider: "gemini"
 
 # Gemini settings (OpenAI-compatible API)
 gemini:
   api_key_env: "GEMINI_API_KEY"
   endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/"
   model: "gemini-3.5-flash"
-  # Spend circuit-breaker, NOT a worst-case sizing: one budget unit is consumed per
-  # HTTP attempt (max_retries=0), so model_retry_max multiplies every logical call.
-  # A feature run costs ~11 logical calls on the happy path with the ja+zh
-  # translation legs; 40 leaves room for roughly one full retry per language.
-  request_limit_per_run: 40
   feature_max_tokens: 64000
   max_tokens: 16000
   batch_size: 5

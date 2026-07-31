@@ -35,7 +35,6 @@ on:
 permissions:
   actions: read
   contents: write
-  models: read
 
 concurrency:
   group: github-pages
@@ -49,7 +48,6 @@ jobs:
     permissions:
       actions: read
       contents: write
-      models: read
     steps:
       - uses: actions/checkout@v4
 
@@ -129,7 +127,6 @@ jobs:
       - name: Generate feature
         if: steps.slot.outputs.should_run == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DRY_RUN: ${{ inputs.dry_run || false }}
           REPLACE_EXISTING: ${{ inputs.replace_existing || false }}

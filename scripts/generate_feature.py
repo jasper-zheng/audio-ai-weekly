@@ -860,7 +860,10 @@ class JsonModel:
     ):
         self.settings = settings
         self.feature_cfg = settings.get("features", FEATURE_SETTINGS)
-        self.client = create_client(settings).with_options(
+        self.client = create_client(
+            settings,
+            request_limit=self.feature_cfg.get("request_limit_per_run"),
+        ).with_options(
             timeout=float(self.feature_cfg.get("model_timeout", 180)), max_retries=0
         )
         self.sleep = sleep

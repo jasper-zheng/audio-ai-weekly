@@ -18,7 +18,6 @@ on:
 permissions:
   actions: read
   contents: write
-  models: read
 
 concurrency:
   group: github-pages
@@ -103,7 +102,6 @@ jobs:
 
       - name: Analyze papers
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/analyze_papers.py
 
@@ -137,7 +135,6 @@ jobs:
 
       - name: Build weekly JSON and update index
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/build_data.py --date "${{ needs.fetch.outputs.reference_date }}"
 

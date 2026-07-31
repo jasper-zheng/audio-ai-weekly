@@ -69,8 +69,8 @@ def test_analyze_batch_fails_closed_after_empty_response(monkeypatch, capsys):
         "Client", (), {"chat": type("Chat", (), {"completions": Completions()})()}
     )()
     monkeypatch.setattr(analyze_papers, "SETTINGS", {
-        "ai": {"provider": "github_models"},
-        "github_models": {
+        "ai": {"provider": "secondary"},
+        "secondary": {
             "model": "openai/gpt-5",
             "retry_max": 1,
             "retry_interval": 0,
@@ -80,7 +80,7 @@ def test_analyze_batch_fails_closed_after_empty_response(monkeypatch, capsys):
     })
     paper = {"id": "1234.5678", "title": "Title", "abstract": "Abstract"}
 
-    with pytest.raises(RuntimeError, match="github_models failed after 1 attempts"):
+    with pytest.raises(RuntimeError, match="secondary failed after 1 attempts"):
         analyze_papers.analyze_batch(client, [paper], None)
 
     output = capsys.readouterr().out
@@ -91,12 +91,12 @@ def test_analyze_batch_fails_closed_after_empty_response(monkeypatch, capsys):
 def test_get_analysis_providers_deduplicates_primary(monkeypatch):
     monkeypatch.setattr(analyze_papers, "SETTINGS", {
         "ai": {"provider": "gemini"},
-        "analysis": {"fallback_providers": ["gemini", "github_models"]},
+        "analysis": {"fallback_providers": ["gemini", "secondary"]},
         "gemini": {},
-        "github_models": {},
+        "secondary": {},
     })
 
-    assert get_analysis_providers() == ["gemini", "github_models"]
+    assert get_analysis_providers() == ["gemini", "secondary"]
 
 
 def test_analyze_batch_uses_explicit_fallback_provider(monkeypatch):
@@ -117,7 +117,7 @@ def test_analyze_batch_uses_explicit_fallback_provider(monkeypatch):
     monkeypatch.setattr(analyze_papers, "SETTINGS", {
         "ai": {"provider": "gemini"},
         "gemini": {},
-        "github_models": {
+        "secondary": {
             "model": "openai/gpt-4.1",
             "retry_max": 1,
             "retry_interval": 0,
@@ -130,7 +130,7 @@ def test_analyze_batch_uses_explicit_fallback_provider(monkeypatch):
         client,
         [{"id": "1234.5678", "title": "Title", "abstract": "Abstract"}],
         None,
-        "github_models",
+        "secondary",
     )
 
     assert calls[0]["model"] == "openai/gpt-4.1"

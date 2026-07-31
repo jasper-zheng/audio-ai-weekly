@@ -83,8 +83,8 @@ def test_generate_trend_waits_for_provider_interval_before_retry(monkeypatch):
         "Client", (), {"chat": type("Chat", (), {"completions": Completions()})()}
     )()
     monkeypatch.setattr(build_data, "SETTINGS", {
-        "ai": {"provider": "github_models"},
-        "github_models": {
+        "ai": {"provider": "secondary"},
+        "secondary": {
             "model": "openai/gpt-5",
             "max_tokens": 400,
             "retry_max": 2,

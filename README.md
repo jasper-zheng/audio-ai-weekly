@@ -2,7 +2,7 @@
 
 This system automatically collects and analyzes papers from the arXiv `cs.SD` and `eess.AS` categories every Friday and publishes the results on GitHub Pages.
 
-Published site: https://kasahart.github.io/audio-ai-weekly/
+Published site: https://jasper-zheng.github.io/audio-ai-weekly/
 
 Official acknowledgement required by the [arXiv brand guidelines](https://info.arxiv.org/brand/brand-guidelines.html):
 
@@ -120,27 +120,37 @@ in the second and fourth Tuesday slots.
 
 ## AI Provider
 
-Select one provider for all AI processing in `config/settings.yaml`:
+Gemini is the only configured provider. GitHub Models, the previous default, was
+[fully retired on 2026-07-30](https://docs.github.com/en/github-models), so its
+settings block has been removed rather than left one `ai.provider` edit away from a
+dead endpoint.
 
 ```yaml
 ai:
-  provider: github_models  # or gemini
+  provider: gemini
 ```
 
-For local runs, export the API key used by the selected provider:
+Gemini uses its official
+[OpenAI-compatible endpoint](https://ai.google.dev/gemini-api/docs/openai)
+with [`gemini-3.5-flash`](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash),
+via the `openai` SDK. Adding a second provider is a new top-level settings block
+plus an entry in `analysis.fallback_providers` and
+`features.model_fallback_providers`; no code change is required.
+
+For local runs:
 
 ```bash
-export GITHUB_TOKEN="..."     # github_models
-export GEMINI_API_KEY="..."   # gemini
+export GEMINI_API_KEY="..."
 ```
 
-The repository currently selects Gemini; GitHub Models remains available by changing
-`ai.provider`. Gemini uses its official
-[OpenAI-compatible endpoint](https://ai.google.dev/gemini-api/docs/openai)
-with [`gemini-3.5-flash`](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash);
-the existing `openai` SDK is used for both providers. When selecting Gemini in GitHub
-Actions, add `GEMINI_API_KEY` under **Settings → Secrets and variables → Actions
-→ New repository secret**. `GITHUB_TOKEN` remains in use for deployment.
+In GitHub Actions, add `GEMINI_API_KEY` under **Settings → Secrets and variables →
+Actions → New repository secret**. `GITHUB_TOKEN` is no longer an AI credential; it
+is used only to publish to `gh-pages` and to read this run's own metadata.
+
+Because there is no second provider, analysis fails closed rather than degrading.
+`features.request_limit_per_run` caps spend for a single deep-dive run; it is set on
+the feature run rather than on the provider, so the multi-week loops in
+`enrich_data.py` and `backfill.py` are not subject to a per-feature budget.
 
 ## Adding or Removing Keywords
 
