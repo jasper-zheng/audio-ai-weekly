@@ -1,0 +1,423 @@
+{
+  "title": "大規模音声言語モデルにおける会話型メモリと自律エージェント制御",
+  "titleEn": "Conversational Memory and Autonomous Agent Control in Large Audio Language Models",
+  "titleZh": "大型音频语言模型中的对话记忆与自主智能体控制",
+  "dek": "大規模音声言語モデルにおけるメモリの分類体系、能動的な音声アシスタンス、音響的ゲーティング、および事実検証の課題に関する厳密な検証。",
+  "dekEn": "A rigorous examination of memory taxonomies, proactive audio assistance, acoustic gating, and fact-verification challenges in large audio language models.",
+  "dekZh": "严谨审视大型音频语言模型中的记忆分类、主动音频辅助、声学门控以及事实验证挑战。",
+  "summaryEn": "Large audio language models (LALMs) have expanded the capabilities of spoken conversational systems, yet they encounter distinct challenges when processing raw acoustic signals instead of text transcripts. Recent research reveals significant limitations across multi-session memory retention, proactive agent triggering, contextual grounding, and truth verification. Standard systems often struggle to track speaker identity, paralinguistic cues, and environmental context over extended dialogues. Furthermore, LALMs frequently act inappropriately when confronted with side-talk or self-talk because they lack robust acoustic-context gating, and they demonstrate a clear modality gap when verifying spoken claims against external evidence. This primer outlines the core technical shifts, model mechanisms, evaluation boundaries, and practical implications for researchers and engineers navigating the evolution of speech-based language agents.",
+  "keyPointsEn": [
+    "Spoken conversational memory requires managing diverse acoustic evidence types—such as speaker identity and environmental sound—across multi-session histories rather than focusing solely on lexical transcripts.",
+    "Proactive audio assistance and acoustic-context gating mechanisms allow models to determine when an audio stream warrants an action, successfully muting side-talk and self-talk.",
+    "Evaluating LALMs exposes a persistent modality gap where models proficient in written tasks fail in speech-based fact-checking and multiple-choice reasoning without specialized reasoning frameworks."
+  ],
+  "perspectives": [
+    {
+      "id": "mechanism",
+      "labelEn": "Model Mechanism and Reasoning",
+      "label": "モデルの仕組みと推論",
+      "labelZh": "模型机制与推理",
+      "descriptionEn": "Explores how models handle long-term dialogue, acoustic evidence, and continuous latents for reasoning.",
+      "description": "モデルが長期的な対話、音響的証拠、および推論のための連続的潜在表現をどのように処理するかを探求する。",
+      "descriptionZh": "探讨模型如何处理长期对话、声学证据以及用于推理的连续潜在变量。",
+      "sourceIds": [
+        "S1",
+        "S6",
+        "S8"
+      ]
+    },
+    {
+      "id": "deployment",
+      "labelEn": "Real-World Deployment and Agent Control",
+      "label": "実世界への導入とエージェント制御",
+      "labelZh": "真实世界部署与智能体控制",
+      "descriptionEn": "Examines real-time processing, proactive audio assistance, and acoustic-context gating for voice agents.",
+      "description": "音声エージェントに向けたリアルタイム処理、能動的な音声アシスタンス、および音響コンテキストのゲーティングを検証する。",
+      "descriptionZh": "审视语音智能体的实时处理、主动音频辅助以及声学上下文门控。",
+      "sourceIds": [
+        "S2",
+        "S3",
+        "S5"
+      ]
+    },
+    {
+      "id": "evaluation",
+      "labelEn": "Evaluation Limits and Modality Gaps",
+      "label": "評価の限界とモダリティのギャップ",
+      "labelZh": "评估局限与模态差距",
+      "descriptionEn": "Analyzes the limitations of benchmarks, text-to-speech modality gaps, and fact verification in spoken dialogue.",
+      "description": "音声対話におけるベンチマークの限界、音声合成（TTS）モダリティのギャップ、および事実検証を分析する。",
+      "descriptionZh": "分析基准测试的局限性、文本转语音模态差距以及口语对话中的事实验证。",
+      "sourceIds": [
+        "S4",
+        "S7"
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "id": "why-needed",
+      "headingEn": "The Concrete Research Problem in Spoken Conversational Systems",
+      "heading": "音声会話システムにおける具体的な研究上の問題",
+      "headingZh": "口语对话系统中的具体研究问题",
+      "blocks": [
+        {
+          "id": "block-why-needed-1",
+          "textEn": "Spoken conversational systems must recover information from prior interactions, yet relevant data in speech extends far beyond simple lexical transcripts to encompass who said a phrase, how it was spoken, and what environmental sounds were audible in the background [S1]. Prior practices in conversational AI predominantly treated memory as a single-session problem focused strictly on text tokens, failing to account for multi-session accumulation and diverse acoustic evidence [S1]. Furthermore, traditional reactive paradigms mean that audio language models (AudioLLMs) only respond when directly queried, restricting their utility in continuous, real-world monitoring applications where spontaneous intervention or assistance is required [S2].",
+          "text": "音声対話システムは過去のやり取りから情報を復元できなければならないが、音声における関連データは、単なる単語のトランスクリプトにとどまらず、誰がそのフレーズを話したか、どのように話されたか、そして背景でどのような環境音が聞こえていたかという点にまで及ぶ[S1]。対話型AIにおけるこれまでの慣行は、主にメモリをテキストトークンに厳格に焦点を当てた単一セッションの問題として扱い、複数セッションにわたる情報の蓄積や多様な音響的証拠を考慮していなかった[S1]。さらに、従来の受動的なパラダイムでは、音声言語モデル（AudioLLM）は直接問い合わされたときにのみ応答するため、自発的な介入や支援が必要とされる継続的な実世界でのモニタリングアプリケーションにおける有用性が制限されている[S2]。",
+          "textZh": "语音对话系统必须从先前的交互中恢复信息，然而语音中的相关数据远远超出了简单的词汇文本，还包括谁说了这句话、说话的方式以及背景中能听到哪些环境声音 [S1]。对话式人工智能先前的做法主要将记忆视为一个严格专注于文本元的单会话问题，未能考虑到多会话的累积和多样化的声学证据 [S1]。此外，传统的反应式范式意味着音频语言模型（AudioLLMs）仅在被直接查询时才做出响应，这限制了它们在需要主动干预或协助的持续、真实世界监控应用中的效用 [S2]。",
+          "sourceIds": [
+            "S1",
+            "S2"
+          ]
+        },
+        {
+          "id": "block-why-needed-2",
+          "textEn": "Beyond memory and proactivity, voice agents frequently misinterpret conversational contexts, reacting indiscriminately to side-talk, self-talk, and speaker-switch scenarios because they lack proper acoustic-context gating [S3]. In parallel, online misinformation increasingly migrates to spoken formats such as podcasts and interviews, highlighting a major limitation: models that perform well on written fact-checking frequently fail when evaluating identical claims delivered orally [S4]. These compounding gaps demonstrate that prior text-centric methodologies are fundamentally insufficient for robust, multimodal spoken agent control [S1, S3, S4].",
+          "text": "メモリや積極性に加え、音声エージェントは適切な音響コンテキストのゲート制御を欠いているため、脇道での会話、独り言、話者の切り替わりといったシナリオに対して無差別に反応し、会話の文脈を頻繁に誤解する[S3]。これと並行して、オンライン上の誤情報はポッドキャストやインタビューなどの音声形式に移行しつつあり、大きな限界を浮き彫りにしている。すなわち、書き言葉のファクトチェックで優れた性能を発揮するモデルが、音声で提示された同一の主張を評価する際にはしばしば失敗するのである[S4]。これらの一連の欠落は、これまでのテキスト中心の方法論が、頑健でマルチモーダルな音声エージェントの制御にとって根本的に不十分であることを実証している[S1, S3, S4]。",
+          "textZh": "除了记忆和主动性之外，语音智能体经常误解对话语境，对闲聊、自言自语和说话者切换场景做出不加区别的反应，因为它们缺乏适当的声学语境门控机制 [S3]。与此同时，网络虚假信息越来越多地向播客和采访等语音形式转移，这凸显了一个主要局限性：在书面事实核查上表现良好的模型，在评估以口头形式传达的相同主张时往往会失败 [S4]。这些不断叠加的差距表明，先前的以文本为中心的方法对于稳健的多模态语音智能体控制来说是根本不够的 [S1, S3, S4]。",
+          "sourceIds": [
+            "S3",
+            "S4"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "headingEn": "Causal Technical Shifts in Audio Language Modeling",
+      "heading": "音声言語モデリングにおける因果関係に基づく技術的移行",
+      "headingZh": "音频语言建模中的因果技术转变",
+      "blocks": [
+        {
+          "id": "block-history-1",
+          "textEn": "The development of large audio language models originated from traditional cascading pipelines that coupled separate automatic speech recognition systems with text-based large language models. These early setups suffered from severe error propagation and discarded vital paralinguistic and acoustic details present in the raw audio signal [S6]. To overcome these boundaries, researchers transitioned toward native end-to-end architectures that fuse audio encoders directly with transformer-based LLM decoders, enabling direct reasoning over speech and audio inputs [S8].",
+          "text": "大規模音声言語モデルの発展は、独立した音声認識システムとテキストベースの大規模言語モデルを組み合わせた、従来の段階的なパイプラインに端を発している。これらの初期の構成は、深刻なエラーの伝播に悩まされ、生音声信号に存在する不可欠なパラ言語学的・音響的詳細を切り捨てていた[S6]。こうした限界を克服するため、研究者らは音声エンコーダーをTransformerベースのLLMデコーダーに直接統合するネイティブなエンドツーエンドのアーキテクチャへと移行し、音声入力に対する直接的な推論を可能にした[S8]。",
+          "textZh": "大型音频语言模型的发展源于传统的级联管道，该管道将独立的自动语音识别系统与基于文本的大型语言模型结合起来。这些早期架构遭受了严重的错误传播，并且丢弃了原始音频信号中存在的至关重要的副语言和声学细节 [S6]。为了克服这些局限，研究人员转向了原生端到端架构，将音频编码器直接与基于 Transformer 的大语言模型解码器融合，从而实现对语音和音频输入的直接推理 [S8]。",
+          "sourceIds": [
+            "S6",
+            "S8"
+          ]
+        },
+        {
+          "id": "block-history-2",
+          "textEn": "However, high-rate audio token sequences generated by these encoders introduced severe computational bottlenecks, prompting subsequent explorations into token compression and state-space model integrations to maintain scalability [S5, S8]. More recently, the field has advanced past basic transcription and classification toward sophisticated capabilities, including continuous latent workspaces for acoustic thinking, multi-session memory tracking, and proactive event detection [S1, S2, S6].",
+          "text": "しかし、これらのエンコーダーによって生成される高レートの音声トークン列は深刻な計算上のボトルネックをもたらし、スケーラビリティを維持するためにトークン圧縮や状態空間モデルの統合に関する後続の研究が促された[S5, S8]。より最近では、この分野は基礎的な文字起こしや分類を超えて、音響的思考のための連続的な潜在ワークスペース、マルチセッションのメモリ追跡、プロアクティブなイベント検出などの洗練された機能へと発展している[S1, S2, S6]。",
+          "textZh": "然而，这些编码器生成的高速率音频标记序列带来了严重的计算瓶颈，促使随后的研究转向标记压缩和状态空间模型集成，以维持可扩展性 [S5, S8]。最近，该领域已从基础的转录和分类发展向复杂的功能，包括用于声学思考的连续潜在工作空间、多会话记忆跟踪以及主动事件检测 [S1, S2, S6]。",
+          "sourceIds": [
+            "S1",
+            "S2",
+            "S5",
+            "S6",
+            "S8"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "approaches",
+      "headingEn": "Comparing Mechanisms and Trade-Offs in Audio Architectures",
+      "heading": "音声アーキテクチャにおけるメカニズムとトレードオフの比較",
+      "headingZh": "音频架构中的机制比较与权衡",
+      "blocks": [
+        {
+          "id": "block-approaches-1",
+          "textEn": "To address computational costs, token compression strategies such as unsupervised segmentation and uniform average pooling reduce the input token count before it reaches the LLM backbone, achieving performance comparable to frame-level models while accelerating inference [S5]. Alternatively, replacing transformer backbones with state-space models offers a parameter-efficient route for memory-constrained scenarios, maintaining competitive performance on closed-ended tasks [S8]. For preserving acoustic nuances that are typically lost during text-aligned training, continuous latent frameworks like Continuous Audio Thinking utilize expert distillation to organize acoustic information within a prefill step without adding autoregressive decoding overhead [S6].",
+          "text": "計算コストに対処するため、教師なしセグメンテーションや一様な平均プーリングなどのトークン圧縮戦略は、LLMバックボーンに到達する前の入力トークン数を削減し、フレームレベルのモデルと同等のパフォーマンスを達成しながら推論を加速させる[S5]。あるいは、Transformerのバックボーンを状態空間モデルに置き換えることは、メモリが制限されたシナリオにおいてパラメータ効率の高い経路を提供し、クローズドエンドのタスクで競争力のあるパフォーマンスを維持する[S8]。テキストに合わせたトレーニング中に通常失われる音響的ニュアンスを保持するために、「Continuous Audio Thinking」のような連続潜在フレームワークは、専門家の蒸留を利用して、自己回帰的デコーディングのオーバーヘッドを追加することなくプレフィルステップ内で音響情報を整理する[S6]。",
+          "textZh": "为了应对计算成本，诸如无监督分割和均匀平均池化等标记压缩策略在输入到达大语言模型主干之前减少了输入标记数量，在实现与帧级模型相当的性能的同时加速了推理 [S5]。或者，用状态空间模型替代Transformer主干为内存受限的场景提供了一条参数高效的途径，在封闭式任务上保持了具有竞争力的性能 [S8]。为了保留在文本对齐训练期间通常会丢失的声学细微差别，诸如连续音频思考之类的连续潜在框架利用专家蒸馏在预填充步骤中组织声学信息，而不会增加自回归解码开销 [S6]。",
+          "sourceIds": [
+            "S5",
+            "S6",
+            "S8"
+          ]
+        },
+        {
+          "id": "block-approaches-2",
+          "textEn": "When managing agent interactivity, paradigms such as Interrupt and Silent Modeling embed proactive decisions directly into LLM decoding using specialized tokens to handle onset detection and de-duplication without domain-specific retraining [S2]. For contextual gating, supervised fine-tuning and specialized routing mechanisms can effectively mute switched commands while preserving responsiveness to authorized wearer instructions [S3]. Each approach presents distinct trade-offs between computational overhead, architectural complexity, and domain generalization [S2, S3, S5, S6, S8].",
+          "text": "エージェントのインタラクティビティを管理する場合、「Interrupt and Silent Modeling」などのパラダイムは、ドメイン固有の再学習なしで発話の検出と重複排除を処理するために、特殊なトークンを使用してプロアクティブな決定をLLMデコーディングに直接埋め込む[S2]。コンテキストゲーティングに関しては、教師ありファインチューニングと特殊なルーティングメカニズムにより、許可された着用者からの指示に対する応答性を維持しながら、切り替えられたコマンドを効果的にミュートすることができる[S3]。各アプローチは、計算オーバーヘッド、アーキテクチャの複雑さ、およびドメイン汎化の間に明確なトレードオフを提示する[S2, S3, S5, S6, S8]。",
+          "textZh": "在管理智能体交互性时，“中断与静默建模”（Interrupt and Silent Modeling）等范式使用专用标记将主动决策直接嵌入大语言模型解码中，以处理起始检测和去重，而无需特定领域的重新训练 [S2]。对于上下文门控，监督微调和专门的路由机制可以有效地静音切换后的指令，同时保持对授权佩戴者指令的响应能力 [S3]。每种方法都在计算开销、架构复杂性和领域泛化之间呈现出明显的权衡 [S2, S3, S5, S6, S8]。",
+          "sourceIds": [
+            "S2",
+            "S3",
+            "S5",
+            "S6",
+            "S8"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "perspectives",
+      "headingEn": "Multidimensional Perspectives on LALM Functionality",
+      "heading": "LALMの機能に関する多次元的な視点",
+      "headingZh": "关于大型音频语言模型功能的多维视角",
+      "blocks": [
+        {
+          "id": "block-perspectives-1",
+          "textEn": "Understanding modern LALMs requires examining three complementary dimensions: model mechanisms, real-world deployment, and evaluation boundaries [S1, S2, S4]. The mechanism perspective highlights how models process long-term dialogue, speaker identity, and acoustic evidence through specialized latent spaces and memory operations [S1, S6]. The deployment perspective focuses on practical agent control, analyzing real-time streaming latency, proactive audio assistance, and acoustic-context gating to prevent false triggers during side-talk [S2, S3].",
+          "text": "現代の大規模音声言語モデル（LALM）を理解するには、モデルのメカニズム、実世界の展開、評価の境界という、補完し合う3つの側面を検証する必要があります。メカニズムの視点では、モデルが長期的な対話、話者の身元、音響的証拠を、特化された潜在空間とメモリ操作を通じてどのように処理するかを浮き彫りにします。展開の視点は、実践的なエージェント制御に焦点を当て、リアルタイムのストリーミング遅延、プロアクティブな音声支援、およびサイドトーク中の誤作動を防ぐための音響コンテキストゲーティングを分析します。",
+          "textZh": "理解现代大音频语言模型需要考察三个互补的维度：模型机制、实际部署以及评估边界。机制维度强调模型如何通过专门的潜空间和记忆操作来处理长期对话、说话人身份和声学证据。部署维度则聚焦于实际的智能体控制，分析实时流式传输延迟、主动语音辅助以及用于防止旁白期间误触发的声学上下文门控机制。",
+          "sourceIds": [
+            "S1",
+            "S2",
+            "S3",
+            "S6"
+          ]
+        },
+        {
+          "id": "block-perspectives-2",
+          "textEn": "Finally, the evaluation perspective addresses the persistent modality gap between text and speech, exposing how benchmark vulnerabilities—such as sensitivity to choice ordering and paraphrasing—complicate fair model comparison [S4, S7]. Together, these perspectives provide a comprehensive framework for analyzing the strengths and limitations of current audio language technologies [S1, S2, S3, S4, S6, S7].",
+          "text": "最後に、評価の視点は、テキストと音声の間に永続的に存在するモダリティのギャップに対処し、選択肢の順序や言い換えに対する感度などのベンチマークの脆弱性が、公平なモデル比較をどのように複雑にしているかを明らかにします。これらの視点を合わせることで、現在の音声言語技術の強みと限界を分析するための包括的な枠組みが提供されます。",
+          "textZh": "最后，评估维度解决了文本与语音之间持续存在的模态鸿沟，揭示了基准测试的脆弱性（例如对选项顺序和释义的敏感性）如何使公正的模型比较变得复杂。这些维度共同构成了一个全面的框架，用于分析当前音频语言技术的优势与局限性。",
+          "sourceIds": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S6",
+            "S7"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "limits",
+      "headingEn": "Evaluation Boundaries and Benchmark Vulnerabilities",
+      "heading": "評価の境界とベンチマークの脆弱性",
+      "headingZh": "评估边界与基准测试漏洞",
+      "blocks": [
+        {
+          "id": "block-limits-1",
+          "textEn": "Evaluating conversational memory reveals that existing benchmarks fall short by focusing almost exclusively on lexical content and single-session problems while ignoring multi-session accumulation and paralinguistic evidence [S1]. Comprehensive evaluations such as VoxMem show that model accuracy degrades significantly as history length grows and complexity increases, with performance on speaker identity and environmental sound lagging far behind semantic retention [S1]. Similarly, multiple-choice question answering frameworks exhibit extreme fragility, where minor variations in choice ordering or question paraphrasing lead to drastically different performance metrics [S7].",
+          "text": "会話メモリの評価からは、既存のベンチマークが、複数セッションにわたる蓄積やパラ言語的証拠を無視して、語彙的内容と単一セッションの問題にほぼ専ら焦点を当てているため、不十分であることが明らかになります。VoxMemなどの包括的な評価により、履歴が長くなり複雑さが増すにつれてモデルの精度が大幅に低下し、話者の身元や環境音に関するパフォーマンスが意味的保持のパフォーマンスを大きく下回ることが示されています。同様に、多肢選択式質問応答のフレームワークは極めて脆弱であり、選択肢の順序や質問の言い換えにおけるわずかな変化が、パフォーマンス指標に劇的な違いをもたらします。",
+          "textZh": "对对话记忆的评估表明，现有的基准测试存在不足，它们几乎只关注词汇内容和单次会话问题，而忽视了多会话积累和副语言证据。诸如 VoxMem 等综合评估显示，随着历史长度的增加和复杂性的提高，模型的准确率显著下降，其中在说话人身份和环境声音方面的表现远远落后于语义保持。同样，多项选择题问答框架表现出极端的脆弱性，选项顺序或问题释义的微小变化就会导致性能指标发生巨大差异。",
+          "sourceIds": [
+            "S1",
+            "S7"
+          ]
+        },
+        {
+          "id": "block-limits-2",
+          "textEn": "In the domain of fact verification, the VeriSpeak benchmark uncovers a persistent text-speech modality gap, wherein models capable of verifying written claims frequently fail on identical spoken claims due to acoustic interference and poor evidence grounding [S4]. Retrieval-augmented generation alone yields limited improvements because models often conflate retrieved textual evidence with the spoken claim itself, necessitating explicit reasoning frameworks to achieve high accuracy [S4]. These findings demonstrate that current evaluation suites must evolve to capture the true complexity of multimodal speech interactions [S1, S4, S7].",
+          "text": "事実検証の領域において、VeriSpeakベンチマークは、テキストと音声のモダリティ間の永続的なギャップを明らかにしています。書き言葉の主張を検証できるモデルであっても、音声の干渉や不十分な根拠の裏付けにより、同一の音声による主張に対しては頻繁に失敗します［S4］。検索拡張生成単体では限定的な改善しか得られません。なぜなら、モデルは検索されたテキストの証拠と音声による主張自体を混同することが多いためであり、高い精度を達成するには明示的な推論フレームワークが必要となります［S4］。これらの発見は、現在の評価スイートが、マルチモーダルな音声インタラクションの真の複雑さを捉えるために進化しなければならないことを示しています［S1、S4、S7］。",
+          "textZh": "在事实核查领域，VeriSpeak 基准测试揭示了一个持续存在的文本与语音模态鸿沟：能够验证书面声明的模型，往往会在完全相同的语音声明上失效，这是由声学干扰和糟糕的证据基础所导致的 [S4]。仅靠检索增强生成只能带来有限的改进，因为模型经常将检索到的文本证据与语音声明本身混为一谈，因此必须采用显式的推理框架才能实现高准确率 [S4]。这些发现表明，当前的评估套件必须不断发展，以捕捉多模态语音交互的真实复杂性 [S1, S4, S7]。",
+          "sourceIds": [
+            "S1",
+            "S4",
+            "S7"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "outlook",
+      "headingEn": "Practical Implications and Future Research Directions",
+      "heading": "実用上の影響と今後の研究方向性",
+      "headingZh": "实际影响与未来研究方向",
+      "blocks": [
+        {
+          "id": "block-outlook-1",
+          "textEn": "For researchers, the identified modality gaps and benchmark limitations point toward an urgent need for robust, standardized evaluation datasets that decouple acoustic understanding from surface-level lexical matching [S1, S4, S7]. Developing principled multi-session memory taxonomies and factorized acoustic-context controls will be vital for advancing foundational audio research [S1, S3]. For practitioners and system developers, deploying real-time voice agents requires careful integration of gating mechanisms—such as post-training filtering or specialized decoding tokens—to ensure models can reliably distinguish between wearer commands and background side-talk in noisy environments [S2, S3].",
+          "text": "研究者にとって、特定されたモダリティのギャップとベンチマークの限界は、音響的理解を表面的な語彙の合致から切り離した、頑健で標準化された評価用データセットの緊急の必要性を示唆しています［S1、S4、S7］。原理に基づいた複数セッションのメモリ分類法や、要因分解された音響コンテキスト制御の開発は、基礎的な音声研究を前進させるために不可欠となります［S1、S3］。実務者やシステム開発者にとって、リアルタイム音声エージェントの導入には、モデルが騒音環境において装着者のコマンドと背景の雑談を確実に見分けられるようにするため、事後トレーニングによるフィルタリングや特殊なデコーディングトークンなどのゲーティングメカニズムの慎重な統合が求められます［S2、S3］。",
+          "textZh": "对于研究人员而言，所识别出的模态鸿沟和基准测试局限性表明，迫切需要建立强大且标准化的评估数据集，将声学理解与表面词汇匹配解耦 [S1, S4, S7]。开发有原则的多会话记忆分类法和因解构的声学上下文控制，对于推动基础音频研究至关重要 [S1, S3]。对于从业者和系统开发人员来说，部署实时语音代理需要仔细整合门控机制——例如后训练过滤或专门的解码词元——以确保模型能够在嘈杂环境中可靠地区分佩戴者的指令与背景闲谈 [S2, S3]。",
+          "sourceIds": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S7"
+          ]
+        },
+        {
+          "id": "block-outlook-2",
+          "textEn": "Furthermore, practitioners should account for evaluation sensitivity when benchmarking models, avoiding reliance on single-metric multiple-choice assessments that are easily skewed by prompt formatting [S7]. While advanced techniques like continuous latent thinking and retrieval-augmented reasoning offer promising paths toward reliable spoken fact-checking and low-latency interaction, developers must remain cautious about translating experimental model performance directly into claims of faultless commercial deployment [S2, S4, S6].",
+          "text": "さらに、実務者はモデルのベンチマーク評価を行う際、プロンプトのフォーマットによって容易に歪められてしまう単一指標の多岐選択式評価への依存を避け、評価の感度を考慮に入れるべきです［S7］。継続的潜在思考や検索拡張推論といった高度な手法は、信頼性の高い音声による事実確認や低遅延のインタラクションに向けた有望な道筋を提供するものですが、開発者は実験的なモデル性能をそのまま完璧な商業展開の主張に直結させることに対して慎重でなければなりません［S2、S4、S6］。",
+          "textZh": "此外，从业者在对模型进行基准测试时应考虑评估敏感性，避免依赖易受提示词格式偏差影响的单一指标多项选择评估 [S7]。虽然诸如连续潜在思考和检索增强推理等先进技术为实现可靠的语音事实核查和低延迟交互提供了有前景的途径，但开发人员必须保持谨慎，切勿将实验性模型性能直接转化为无瑕疵商业部署的承诺 [S2, S4, S6]。",
+          "sourceIds": [
+            "S2",
+            "S4",
+            "S6",
+            "S7"
+          ]
+        }
+      ]
+    }
+  ],
+  "translations": {
+    "ja": {
+      "status": "passed",
+      "revisionCount": 0,
+      "verifiedAt": "2026-10-13T09:53:54.151141+00:00"
+    },
+    "zh": {
+      "status": "passed",
+      "revisionCount": 0,
+      "verifiedAt": "2026-10-13T09:53:54.151141+00:00"
+    }
+  },
+  "schemaVersion": 1,
+  "sourceLanguage": "en",
+  "slug": "2026-10-13-primer-lalm-conversational-memory-and-agency",
+  "type": "primer",
+  "date": "2026-10-13",
+  "generatedAt": "2026-10-13T09:53:54.151141+00:00",
+  "topicKey": "lalm-conversational-memory-and-agency",
+  "searchTerms": [
+    "Large Audio Language Models",
+    "spoken conversational systems"
+  ],
+  "sources": [
+    {
+      "arxivId": "2609.32607",
+      "title": "VoxMem: Benchmarking Multimodal Memory in Large Audio Language Models",
+      "abstract": "Spoken conversational systems must recover information from prior interactions (i.e., memory), yet relevant information in speech extends beyond what was said to who said it, how it was spoken, and what was audible, information that exists only in the audio signal and cannot be recovered from a transcript. Beyond what to remember, memory also demands diverse operations: retrieving a single fact, integrating evidence across turns, tracking an evolving state. Real interactions further unfold across sessions, meaning information accumulates across distinct episodes rather than a single continuous recording. Existing benchmarks fall short on all three dimensions: they focus primarily on lexical content, adopt limited and ad hoc memory operations, and treat memory as a single-session problem. We argue that principled memory evaluation requires jointly characterizing the acoustic evidence to be retained and the operations applied to it, and introduce a taxonomy along these two axes. Building on this taxonomy, we present VoxMem: 3,196 evaluation instances over 34,743 spoken sessions (177 hours) crossing four acoustic evidence types (speech semantics, speaker identity, paralinguistic cues, environmental sound) with four memory operations (information extraction, multi-session reasoning, temporal tracking, and answer refusal), grounded in multi-session histories and stratified across context budgets from 8K to 64K tokens. Evaluating 15 LALMs, no model exceeds 40% at 32K. Models retain what was said far better than who said it, how, or what was audible, a gap that widens for complex operations, grows with history length, and manifests as qualitatively distinct failure modes across evidence types. VoxMem aims to provide a foundation to measure and drive progress on the full scope of spoken conversational memory.",
+      "authors": [
+        "Yang Xiao",
+        "Vidhyasaharan Sethu",
+        "Eun-Jung Holden",
+        "Ting Dang"
+      ],
+      "publishedAt": "2026-10-02",
+      "url": "https://arxiv.org/abs/2609.32607",
+      "origin": "archive",
+      "archiveDate": "2026-10-02",
+      "primaryLinks": [
+        {
+          "label": "Code",
+          "url": "https://github.com/swagshaw/voxmem"
+        },
+        {
+          "label": "Project",
+          "url": "https://swagshaw.github.io/voxmem/"
+        }
+      ],
+      "sourceId": "S1"
+    },
+    {
+      "arxivId": "2609.21183",
+      "title": "I'll Keep an Ear Out: Teaching AudioLLMs Proactive Audio Assistance",
+      "abstract": "Audio large language models (AudioLLMs) operate reactively, responding only when queried. We introduce proactive audio assistance, where an AudioLLM monitors an audio stream and autonomously decides when to alert the user from a single natural-language intent, motivated by wearable applications for Deaf and Hard of Hearing users. We propose Interrupt and Silent Modeling (ISM), a model-agnostic paradigm that embeds proactive decisions into LLM decoding via two special tokens: \\texttt{<interrupt>} and \\texttt{<silent>}, capturing four states: onset detection, sustained-relevance triggering, irrelevance suppression, and de-duplication. Applied to Qwen2-Audio-7B, ISM achieves 99.6\\% interrupt F1 and perfect de-duplication recall on ESC-50. On noisy Epic-Sounds kitchen audio, ISM achieves the highest interrupt F1 without domain-specific training, the only method maintaining strong onset detection without over-triggering or over-suppression. Streaming evaluation confirms real-time viability with 3.5-second average latency.",
+      "authors": [
+        "Amit Kumar Singh Yadav",
+        "Ritvik Shrivastava",
+        "Xuan Zhang",
+        "Seungwhan Moon",
+        "Shashank Jain"
+      ],
+      "publishedAt": "2026-10-02",
+      "url": "https://arxiv.org/abs/2609.21183",
+      "origin": "archive",
+      "archiveDate": "2026-10-02",
+      "primaryLinks": [],
+      "sourceId": "S2"
+    },
+    {
+      "arxivId": "2609.32536",
+      "title": "Do Audio LLMs Listen Before They Act? Diagnosing Acoustic-Context Gating in Voice Agents",
+      "abstract": "Audio language models can recognize spoken commands and invoke tools, but an agent must first decide whether the acoustic and conversational context warrants action. We introduce VGBench, a 1,018-item diagnostic benchmark for action-level addressedness across side-talk, self-talk, and speaker-switch scenarios. Each item uses a shared action space comprising silence, a tool call, and a natural-language answer. Speaker-switch pairs hold the specified words fixed while source, distance rendering, and a temporal boundary define a controlled wearer-to-bystander shift. Six raw Audio LLMs and three training-free adaptations often identify the target tool yet rarely withhold action under this shift; the highest raw switch mute rate is 14%. We then use VoxGate as a post-training case study. Supervised training mutes 91.3% of switched commands while choosing the correct tool for all nearby wearer commands and text-only controls. An exploratory GRPO stage has similar switch performance; side-talk accuracy rises from 68.4% to 70.9%, and self-talk muting from 52.0% to 60.0%. Factorized controls identify an independent source-change effect, while sensitivity to the far-field manipulation varies across acoustic renderings. The benchmark therefore measures multi-cue acoustic-context gating rather than isolated speaker identity.",
+      "authors": [
+        "Yanjie Zhang",
+        "Nanchen Hu",
+        "Yushi Sun"
+      ],
+      "publishedAt": "2026-10-02",
+      "url": "https://arxiv.org/abs/2609.32536",
+      "origin": "archive",
+      "archiveDate": "2026-10-02",
+      "primaryLinks": [],
+      "sourceId": "S3"
+    },
+    {
+      "arxivId": "2609.30227",
+      "title": "To Trust or Not to Trust: Retrieval-Augmented Fact Checking in Speech",
+      "abstract": "Online misinformation increasingly appears in spoken formats such as news clips, podcasts, interviews, political speeches, and social media videos, creating a need for fact-checking systems that can verify claims directly from speech. We introduce VeriSpeak, a probe benchmark for studying speech-based fact verification in Large Audio Language Models (LALMs). VeriSpeak contains 3,879 spoken claims spanning temporal, geographical, and relational facts, with balanced true and false labels. The benchmark is designed to examine whether factual verification ability transfers from text to speech, and whether retrieval-augmented LALMs can use textual evidence to correctly support or refute spoken claims. Our experiments reveal a consistent text-speech modality gap: LALMs that verify written claims reliably often fail on the same claims when spoken. Moreover, retrieval alone provides limited gains because models frequently conflate retrieved evidence with the spoken claim. In contrast, retrieval combined with explicit reasoning improves claim-evidence comparison, with a thinking-tuned LALM reaching 86.1% accuracy. VeriSpeak highlights that effective speech misinformation detection requires not only speech understanding, but also grounded reasoning over retrieved evidence. The dataset is publicly available via Hugging Face at https://huggingface.co/datasets/abhiram4572/VeriSpeak.",
+      "authors": [
+        "Debajyoti Mazumder",
+        " Mamta",
+        "Abhirama Subramanyam Penamakuri"
+      ],
+      "publishedAt": "2026-10-02",
+      "url": "https://arxiv.org/abs/2609.30227",
+      "origin": "archive",
+      "archiveDate": "2026-10-02",
+      "primaryLinks": [],
+      "sourceId": "S4"
+    },
+    {
+      "arxivId": "2511.20973",
+      "title": "Towards Audio Token Compression in Large Audio Language Models",
+      "abstract": "Large Audio Language Models (LALMs) deliver strong performance across speech and audio tasks, but their audio encoders generate high-rate token sequences (e.g., 25 tokens/s), making attention computation costly and limiting scalability. In this paper, we explore techniques such as unsupervised segmentation, uniform average pooling, etc., to reduce the number of audio tokens before they are consumed by the LLM decoder. To mitigate potential performance degradation, we employ low-rank adapters during finetuning. We evaluate our proposed models on two tasks, automatic speech recognition and speech-to-speech translation tasks, that are dependent on effectively uncovering the underlying lexical content of the input signal, and study the effect of downsampling on these tasks. Experimental results show that compressed LALMs can achieve performance closer to frame-level LALMs while reducing the input audio token count up to three times before the LLM backbone.",
+      "authors": [
+        "Saurabhchand Bhati",
+        "Samuel Thomas",
+        "Hilde Kuehne",
+        "Rogerio Feris",
+        "James Glass"
+      ],
+      "publishedAt": "2025-11-26T02:00:38Z",
+      "url": "https://arxiv.org/abs/2511.20973",
+      "origin": "external",
+      "primaryLinks": [],
+      "sourceId": "S5"
+    },
+    {
+      "arxivId": "2606.18273",
+      "title": "Continuous Audio Thinking for Large Audio Language Models",
+      "abstract": "Large audio language models (LALMs) have shown impressive capabilities on diverse audio understanding tasks, ranging from speech transcription to music analysis. However, because LALMs are typically trained to produce text-aligned responses, their hidden states are progressively shaped for text generation rather than for preserving acoustic information. As a result, the diverse acoustic content that audio carries, such as phonetic detail, prosody, sound events, affect, and pitch, is lost along the way and difficult to leverage in the response. We introduce Continuous Audio Thinking (CoAT), a framework that equips audio language models with a continuous latent workspace for organizing acoustic information prior to response generation, grounded by distillation from audio experts. Within the thinking space, the model can utilize the rich acoustic information provided by expert distillation when generating its response. Furthermore, the proposed continuous thinking block can be processed in a single prefill, so CoAT does not require additional autoregressive decoding cost over the baseline. Across three LALMs, Qwen2-Audio, Qwen2.5-Omni-7B, and Audio Flamingo~3, performance gains on a broad benchmark suite spanning audio reasoning, audio understanding, music classification, speech emotion, and speech transcription demonstrate the effectiveness of CoAT. Further analysis confirms that the auxiliary supervision propagates from the thinking positions to the model's textual responses.",
+      "authors": [
+        "Gyojin Han",
+        "Dong-Jae Lee",
+        "Changho Choi",
+        "Jongsuk Kim",
+        "Junmo Kim"
+      ],
+      "publishedAt": "2026-06-05T11:38:30Z",
+      "url": "https://arxiv.org/abs/2606.18273",
+      "origin": "external",
+      "primaryLinks": [],
+      "sourceId": "S6"
+    },
+    {
+      "arxivId": "2510.04584",
+      "title": "Robustness assessment of large audio language models in multiple-choice evaluation",
+      "abstract": "Recent advances in large audio language models (LALMs) have primarily been assessed using a multiple-choice question answering (MCQA) framework. However, subtle changes, such as shifting the order of choices, result in substantially different results. Existing MCQA frameworks do not account for this variability and report a single accuracy number per benchmark or category. We dive into the MCQA evaluation framework and conduct a systematic study spanning three benchmarks (MMAU, MMAR and MMSU) and four models: Audio Flamingo 2, Audio Flamingo 3, Qwen2.5-Omni-7B-Instruct, and Kimi-Audio-7B-Instruct. Our findings indicate that models are sensitive not only to the ordering of choices, but also to the paraphrasing of the question and the choices. Finally, we propose a simpler evaluation protocol and metric that account for subtle variations and provide a more detailed evaluation report of LALMs within the MCQA framework.",
+      "authors": [
+        "Fernando López",
+        "Santosh Kesiraju",
+        "Jordi Luque"
+      ],
+      "publishedAt": "2025-10-06T08:36:17Z",
+      "url": "https://arxiv.org/abs/2510.04584",
+      "origin": "external",
+      "primaryLinks": [],
+      "sourceId": "S7"
+    },
+    {
+      "arxivId": "2411.15685",
+      "title": "State-Space Large Audio Language Models",
+      "abstract": "Large Audio Language Models (LALM) combine the audio perception models and the Large Language Models (LLM) and show a remarkable ability to reason about the input audio, infer the meaning, and understand the intent. However, these systems rely on Transformers which scale quadratically with the input sequence lengths which poses computational challenges in deploying these systems in memory and time-constrained scenarios. Recently, the state-space models (SSMs) have emerged as an alternative to transformer networks. While there have been successful attempts to replace transformer-based audio perception models with state-space ones, state-space-based LALMs remain unexplored. First, we begin by replacing the transformer-based audio perception module and then replace the transformer-based LLM and propose the first state-space-based LALM. Experimental results demonstrate that space-based LALM despite having a significantly lower number of parameters performs competitively with transformer-based LALMs on close-ended tasks on a variety of datasets.",
+      "authors": [
+        "Saurabhchand Bhati",
+        "Yuan Gong",
+        "Leonid Karlinsky",
+        "Hilde Kuehne",
+        "Rogerio Feris",
+        "James Glass"
+      ],
+      "publishedAt": "2024-11-24T02:21:28Z",
+      "url": "https://arxiv.org/abs/2411.15685",
+      "origin": "external",
+      "primaryLinks": [],
+      "sourceId": "S8"
+    }
+  ],
+  "readTimeMinutes": 8,
+  "readTimeMinutesZh": 9,
+  "readTimeMinutesEn": 4,
+  "verification": {
+    "status": "passed",
+    "revisionCount": 0,
+    "verifiedAt": "2026-10-13T09:53:54.151141+00:00",
+    "canonicalLanguage": "en"
+  }
+}

@@ -1,4 +1,37 @@
 {
-  "features": [],
-  "generatedAt": ""
+  "features": [
+    {
+      "slug": "2026-10-13-primer-lalm-conversational-memory-and-agency",
+      "type": "primer",
+      "date": "2026-10-13",
+      "titleEn": "Conversational Memory and Autonomous Agent Control in Large Audio Language Models",
+      "title": "大規模音声言語モデルにおける会話型メモリと自律エージェント制御",
+      "titleZh": "大型音频语言模型中的对话记忆与自主智能体控制",
+      "dekEn": "A rigorous examination of memory taxonomies, proactive audio assistance, acoustic gating, and fact-verification challenges in large audio language models.",
+      "dek": "大規模音声言語モデルにおけるメモリの分類体系、能動的な音声アシスタンス、音響的ゲーティング、および事実検証の課題に関する厳密な検証。",
+      "dekZh": "严谨审视大型音频语言模型中的记忆分类、主动音频辅助、声学门控以及事实验证挑战。",
+      "readTimeMinutesEn": 4,
+      "readTimeMinutes": 8,
+      "readTimeMinutesZh": 9,
+      "sourceCount": 8,
+      "file": "2026-10-13-primer-lalm-conversational-memory-and-agency.json",
+      "topicKey": "lalm-conversational-memory-and-agency",
+      "searchTerms": [
+        "Large Audio Language Models",
+        "spoken conversational systems"
+      ],
+      "sourcePaperIds": [
+        "2609.32607",
+        "2609.21183",
+        "2609.32536",
+        "2609.30227",
+        "2511.20973",
+        "2606.18273",
+        "2510.04584",
+        "2411.15685"
+      ],
+      "generatedAt": "2026-10-13T09:53:54.151141+00:00"
+    }
+  ],
+  "generatedAt": "2026-10-13T09:53:54.151141+00:00"
 }
