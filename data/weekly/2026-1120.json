@@ -1,0 +1,364 @@
+{
+  "date": "2026-1120",
+  "generated_at": "2026-11-20T00:00:00+00:00",
+  "total": 5,
+  "categories": [
+    {
+      "id": "foundation",
+      "label": "音の基盤モデル",
+      "labelEn": "Audio Foundation Models",
+      "labelZh": "音频基础模型",
+      "color": "#38bdf8",
+      "papers": [
+        {
+          "id": "2611.21088v1",
+          "date": "Nov 16",
+          "title": "AudioTrace: File-Level Membership Detection for Audio Large Language Models",
+          "titleJa": "AudioTrace：音声大規模言語モデルのためのファイル単位のメンバーシップ検出",
+          "titleZh": "AudioTrace：音频大语言模型的基于文件级别的成员推断检测",
+          "authors": [
+            "Guangzhi Sun",
+            "Xiao Zhan",
+            "Shuai Wang",
+            "Jose Such",
+            "Phil Woodland"
+          ],
+          "org": "",
+          "orgSource": null,
+          "abstract": "Significant privacy and copyright concerns are raised by the use of publicly available audio recordings to train audio large language models (LLMs), yet effective auditing methods remain limited. Existing membership inference attacks typically assume knowledge of complete training examples, including their associated textual supervision. In practice, however, audio recordings may be paired with privately generated transcripts, captions, or question-answer pairs that are unavailable to owners of the recordings. This motivates audio-file-level membership inference, which determines whether a recording was used for training without assuming knowledge of its training tasks and annotations. This paper provides the first systematic investigation of this challenge and introduces AudioTraceBench, a controlled benchmark comprising 1,285 audio recordings with explicit fine-tuning membership labels. Evaluations across three audio LLMs show that existing text- and video-based membership inference methods adapted to audio perform close to random guessing.   To address this challenge, AudioTrace is proposed, where audio-conditioned proxy questions are generated using the target model, and membership evidence is extracted from its responses and aggregated at the recording level. Consistent improvements over existing baselines are observed, with AUROC reaching 0.60 and increasing further under increased fine-tuning exposure or adaptation capacity. Further experiments were conducted to examine the factors influencing membership signals for audio-file-level detection. These findings establish audio-file-level membership inference as a distinct and practically important auditing challenge, with AudioTrace providing an effective initial approach to this challenge.",
+          "comment": null,
+          "journalRef": null,
+          "categories": [
+            "cs.CR",
+            "cs.SD"
+          ],
+          "url": "https://arxiv.org/abs/2611.21088v1",
+          "category": "foundation",
+          "task": "メンバーシップ推論",
+          "taskEn": "Membership inference",
+          "taskZh": "成员推断",
+          "proposedMethod": "AudioTrace",
+          "datasets": [
+            "AudioTraceBench"
+          ],
+          "what": "音声大規模言語モデル（LLM）における訓練データのプライバシーと著作権の課題に対処するため、音声ファイル単位のメンバーシップ推論手法「AudioTrace」とベンチマーク「AudioTraceBench」を提案する。",
+          "whatEn": "Proposes AudioTrace, an audio-file-level membership inference approach for audio large language models, alongside a controlled benchmark AudioTraceBench to address privacy and copyright concerns.",
+          "whatZh": "提出了AudioTrace，一种针对音频大语言模型的音频文件级成员推断方法，以及控制基准AudioTraceBench，以解决隐私和版权问题。",
+          "novel": "著者らは、タスクや注釈の知識を前提とせずに、音声データが訓練に使用されたかを判定する音声ファイル単位のメンバーシップ推論という新たな監査課題を体系的に調査したことを主張している。",
+          "novelEn": "The authors claim novelty in systematically investigating audio-file-level membership inference—determining whether a recording was used for training without assuming knowledge of training tasks and annotations—supported by a controlled benchmark.",
+          "novelZh": "作者声称其创新之处在于系统性地研究了音频文件级成员推断这一具有挑战性的新审计任务（即在不假设了解训练任务和标注的情况下确定录音是否用于训练），并提供了受控基准。",
+          "method": "ターゲットモデルを用いて音声条件付きのプロキシ質問を生成し、その応答からメンバーシップの証拠を抽出してレコーディングレベルで集約する。",
+          "methodEn": "Generates audio-conditioned proxy questions using the target model, extracts membership evidence from its responses, and aggregates it at the recording level.",
+          "methodZh": "使用目标模型生成音频条件代理问题，从其响应中提取成员身份证据，并在录音级别进行聚合。",
+          "validation": "3つの音声LLMを用いた評価において、既存の適応手法はランダム推測に近い性能であったのに対し、AudioTraceはAUROCが0.60に達するなど一貫した改善を示した。",
+          "validationEn": "Evaluations across three audio LLMs show existing adapted methods perform close to random guessing, while AudioTrace consistently improves performance with AUROC reaching 0.60.",
+          "validationZh": "在三个音频大语言模型上的评估表明，现有的适配方法表现接近随机猜测，而AudioTrace表现出持续的改进，AUROC达到了0.60。",
+          "discussion": "メンバーシップ信号に影響を与える要因を検証し、AudioTraceが実用的な初期アプローチを提供することを示している。",
+          "discussionEn": "Examines factors influencing membership signals for audio-file-level detection, establishing it as a practically important auditing challenge.",
+          "discussionZh": "检查了影响音频文件级检测成员信号的因素，确立了其作为一个具有实际重要性的审计挑战的地位。",
+          "abstractJa": "音声大規模言語モデル（LLM）の訓練における音声データの利用は深刻なプライバシーと著作権の懸念を引き起こすが、監査手法は限られている。本論文では、訓練タスクの知識を前提とせずに音声が訓練に使用されたかを判定する音声ファイル単位のメンバーシップ推論を初めて体系的に調査し、1,285件の録音からなるベンチマーク「AudioTraceBench」を導入する。既存の適応手法がランダム推測に近い性能を示す中、ターゲットモデルを用いてプロキシ質問を生成し応答から証拠を集約する「AudioTrace」を提案した。実験により、AUROCが0.60に達するなど既存ベースラインを上回る改善が確認された。",
+          "abstractZh": "使用公开音频录音训练音频大语言模型（LLM）引发了重大的隐私和版权问题，但有效的审计方法仍然有限。本文对音频文件级成员推断进行了首次系统性研究，引入了包含1,285个录音的受控基准AudioTraceBench。在三个音频LLM上的评估表明，从文本和视频改编的现有成员推断方法表现接近随机猜测。为了解决这一挑战，提出了AudioTrace，通过目标模型生成音频条件代理问题，从其响应中提取成员身份证据并在录音级别聚合。观察到对现有基准的一致改进，AUROC达到了0.60。",
+          "nextReads": [
+            {
+              "label": "Extracting Training Data from Large Language Models (2020)",
+              "arxivId": "2012.07805",
+              "url": "https://arxiv.org/abs/2012.07805",
+              "verified": true,
+              "source": "arxiv_api"
+            }
+          ],
+          "citationCount": 0,
+          "githubRepo": null,
+          "upvotes": null,
+          "projectPage": null
+        }
+      ]
+    },
+    {
+      "id": "generation",
+      "label": "音声生成",
+      "labelEn": "Audio Generation",
+      "labelZh": "音频生成",
+      "color": "#4ade80",
+      "papers": [
+        {
+          "id": "2611.22593v1",
+          "date": "Nov 17",
+          "title": "High-Fidelity Binarized Neural Vocoder",
+          "titleJa": "高忠実度二値化ニューラルボコーダー",
+          "titleZh": "高保真二值化神经声码器",
+          "authors": [
+            "Andong Li",
+            "Tong Lei",
+            "Xiaodong Li",
+            "Chengshi Zheng"
+          ],
+          "org": "",
+          "orgSource": null,
+          "abstract": "Neural vocoders have achieved remarkable progress in high-fidelity waveform generation in recent years, but most existing methods still rely on full-precision operators, leading to non-negligible storage and computational costs during inference. Binary neural networks (BNNs) provide an alternative direction by quantizing weights and activations to 1 bit. However, directly applying binarization to neural vocoders is rather challenging as it inherently incurs severe information loss. To this end, we propose BiVoC, a BNN-oriented time-frequency neural vocoder for high-fidelity waveform generation. Building on our previous full-precision RNDVoC framework, BiVoC adapts the inverse-problem formulation, range-null decomposition, and fineto-coarse non-uniform subband modeling to the 1-bit setting. Specifically, we develop a simple binarized convolutional unit to provide stable time-frequency feature modeling under binary representations. Furthermore, we analyze the quality-complexity sensitivity of different modules and propose a mixed-precision design to retain quality-sensitive components in full precision while binarizing computation-dominant parts. Extensive experiments are conducted on LibriTTS and multiple out-of-distribution benchmarks. Both objective and subjective results demonstrate that BiVoC substantially outperforms BNN variants obtained by directly binarizing existing vocoders, while achieving competitive performance against several mainstream full-precision vocoder baselines under much lower theoretical computational cost. These results demonstrate the promising potential of BNNs in the audio generation field. Codes and pre-trained weights are available at https://github.com/Andong-Li-speech/BiVoC.",
+          "comment": "Accepted by IEEE Transactions on Audio, Speech and Language Processing 2026, 15 pages, 10 figures, 16 tables",
+          "journalRef": null,
+          "categories": [
+            "cs.SD"
+          ],
+          "url": "https://arxiv.org/abs/2611.22593v1",
+          "category": "generation",
+          "task": "音声合成",
+          "taskEn": "Audio synthesis",
+          "taskZh": "音频合成",
+          "proposedMethod": "BiVoC",
+          "datasets": [
+            "LibriTTS"
+          ],
+          "what": "推論時のストレージおよび計算コストを削減しつつ、高忠実度の波形生成を実現する、1ビット設定に向けたBNN指向の時周波数ニューラルボコーダー「BiVoC」を提案する。",
+          "whatEn": "Proposes BiVoC, a BNN-oriented time-frequency neural vocoder for high-fidelity waveform generation with low storage and computational costs during inference.",
+          "whatZh": "提出了BiVoC，一种面向二值神经网络的时频神经声码器，用于实现低存储和计算成本的高保真波形生成。",
+          "novel": "著者らは、フルプレシジョンのRNDVoCフレームワークに基づき、逆問題定式化、範囲ゼロ分解、ファイン・トゥ・コースの非一様サブバンドモデリングを1ビット設定に適応させ、安定した時周波数特徴モデリングのための単純な二値化畳み込みユニットを開発したことを主張している。",
+          "novelEn": "The authors claim novelty in adapting inverse-problem formulation, range-null decomposition, and fine-to-coarse non-uniform subband modeling to the 1-bit setting based on their previous RNDVoC framework, along with developing a binarized convolutional unit for stable time-frequency feature modeling.",
+          "novelZh": "作者声称其创新之处在于，基于以往的RNDVoC框架，将逆问题公式化、范围零分解和由粗到细的非均匀子带建模适应于1比特设置，并开发了用于稳定时频特征建模的简单二值化卷积单元。",
+          "method": "逆問題定式化や非一様サブバンドモデリングを1ビット設定に適応させ、二値化畳み込みユニットを開発するとともに、品質に敏感なコンポーネントをフルプレシジョンに維持する混合精度設計を導入する。",
+          "methodEn": "Adapts inverse-problem formulation and non-uniform subband modeling to the 1-bit setting, develops a binarized convolutional unit, and introduces a mixed-precision design to retain quality-sensitive components in full precision.",
+          "methodZh": "将逆问题公式化和非均匀子带建模适应于1比特设置，开发了二值化卷积单元，并引入了混合精度设计，以在全精度下保留对质量敏感的组件。",
+          "validation": "LibriTTSおよび複数の分布外ベンチマークで行われた実験により、BiVoCは既存のボコーダーの直接二値化版を大きく上回り、はるかに低い理論計算コストでフルプレシジョンのベースラインと同等の性能を達成することが示されている。",
+          "validationEn": "Experiments on LibriTTS and out-of-distribution benchmarks show that BiVoC substantially outperforms direct binarization variants while achieving competitive performance against full-precision baselines at much lower computational cost.",
+          "validationZh": "在LibriTTS和多个分布外基准测试上的实验表明，BiVoC显著优于直接二值化变体，同时在低得多的计算成本下对全精度基准达到了有竞争力的性能。",
+          "discussion": "著者らは、オーディオ生成分野におけるBNNの有望な可能性を示し、コードと事前学習済み重みを公開している。",
+          "discussionEn": "Demonstrates the promising potential of BNNs in the audio generation field and provides public code and pre-trained weights.",
+          "discussionZh": "展示了二值神经网络在音频生成领域的广阔潜力，并公开了代码和预训练权重。",
+          "abstractJa": "ニューラルボコーダーは高忠実度な波形生成で目覚ましい進歩を遂げたが、ほとんどの手法はフルプレシジョン演算子に依存しており、推論時のコストが高い。二値神経ネットワーク（BNN）は代替手段となるが、直接適用すると情報損失が深刻になる。この課題に対し、本研究では高忠実度波形生成のためのBNN指向時周波数ニューラルボコーダー「BiVoC」を提案する。過去のRNDVoCフレームワークに基づき、1ビット設定向けに逆問題定式化や非一様サブバンドモデリングを適応させる。LibriTTSや多様なベンチマークを用いた実験により、BiVoCは既存のボコーダーを直接二値化したものよりも大幅に優れ、低計算コストでフルプレシジョンベースラインと競合する性能を達成することが示された。",
+          "abstractZh": "神经声码器在高保真波形生成方面取得了显著进展，但大多数现有方法仍依赖全精度算子，导致推理时产生不可忽视的存储和计算成本。二值神经网络（BNN）提供了替代方向，但直接应用会导致严重的的信息丢失。为此，我们提出了BiVoC，一种面向BNN的时频神经声码器，用于高保真波形生成。在以往的RNDVoC框架基础上，BiVoC将逆问题公式化、范围零分解和由粗到细的非均匀子带建模适应于1比特设置。在LibriTTS和多个分布外基准上的广泛实验表明，BiVoC显著优于直接二值化的声码器变体，同时在低得多的计算成本下达到了与主流全精度基准相当的性能。",
+          "nextReads": [
+            {
+              "label": "HiFi-GAN: Generative Adversarial Networks for Efficient and High Fidelity Speech Synthesis (2020)",
+              "arxivId": "2010.05646",
+              "url": "https://arxiv.org/abs/2010.05646",
+              "verified": true,
+              "source": "arxiv_api"
+            },
+            {
+              "label": "BigVGAN: A Universal Neural Vocoder with Large-Scale Training (2022)",
+              "arxivId": "2206.04658",
+              "url": "https://arxiv.org/abs/2206.04658",
+              "verified": true,
+              "source": "arxiv_api"
+            }
+          ],
+          "citationCount": null,
+          "githubRepo": null,
+          "upvotes": null,
+          "projectPage": null
+        },
+        {
+          "id": "2611.21809v1",
+          "date": "Nov 16",
+          "title": "Evaluating the Evaluation of Music Generation Models with Generative Psychometrics",
+          "titleJa": "生成的精神測定学を用いた音楽生成モデルの評価方法の評価",
+          "titleZh": "使用生成心理测学评估音乐生成模型的评估",
+          "authors": [
+            "João Carlos Santana Silveira",
+            "Caio Von Rondow Morais",
+            "Frederico Pedrosa",
+            "Lucas N. Ferreira"
+          ],
+          "org": "",
+          "orgSource": null,
+          "abstract": "Subjective user studies are one of the major methods for evaluating music generation models. However, subjective evaluation protocols vary widely and are rarely specified in enough detail to be reproduced, hindering comparison across studies. In this paper, we map subjective evaluation methods in ISMIR music generation papers from 2020-2025 and apply generative psychometrics to assess the stability of their items. We extract 284 items from the papers' methodological descriptions, using an LLM and manual validation to standardize them. We represent these items as contextual embeddings and apply Unique Variable Analysis to remove redundant, locally dependent items and Bootstrap Exploratory Graph Analysis to estimate their latent dimensions. Results show the network converges onto a taxonomy of six stable quality dimensions: Rhythm, Melody, Audio, Composition, Structure, and Lyrics, pointing to a unified methodology for conducting user studies to evaluate music generation models.",
+          "comment": "Accepted to the 2nd Latin American Music Information Retrieval (LAMIR) workshop",
+          "journalRef": null,
+          "categories": [
+            "cs.SD",
+            "cs.AI"
+          ],
+          "url": "https://arxiv.org/abs/2611.21809v1",
+          "category": "generation",
+          "task": "音楽生成",
+          "taskEn": "Music generation",
+          "taskZh": "音乐生成",
+          "proposedMethod": "世代別精神測定学フレームワーク",
+          "datasets": [],
+          "what": "ISMIRの音楽生成論文における主観的評価方法をマッピングし、生成的精神測定学を適用して項目の安定性を評価する。",
+          "whatEn": "Maps subjective evaluation methods in ISMIR music generation papers and applies generative psychometrics to assess item stability.",
+          "whatZh": "梳理了ISMIR音乐生成论文中的主观评估方法，并应用生成心理测学来评估评估项的稳定性。",
+          "novel": "著者らは、LLMと手動検証を用いて方法論的説明から284項目を抽出し、ユニーク変数分析とブートストラップ探索的グラフ分析を適用して、6つの安定した品質次元の分類群へと収束させたことを主張している。",
+          "novelEn": "The authors claim novelty in extracting 284 items using an LLM and manual validation, and applying Unique Variable Analysis and Bootstrap Exploratory Graph Analysis to converge onto a taxonomy of six stable quality dimensions.",
+          "novelZh": "作者声称其创新之处在于使用大语言模型和人工验证提取了284个项目，并应用唯一变量分析和自助法探索性图分析，使其收敛到一个包含六个稳定质量维度的分类法。",
+          "method": "方法論的記述から抽出した284項目をコンテキスト埋め込みとして表現し、ユニーク変数分析によって冗長な項目を除去し、ブートストラップ探索的グラフ分析によって潜在次元を推定する。",
+          "methodEn": "Represents extracted items as contextual embeddings and applies Unique Variable Analysis to remove redundant items and Bootstrap Exploratory Graph Analysis to estimate latent dimensions.",
+          "methodZh": "将提取的项目表示为上下文嵌入，应用唯一变量分析去除冗余项目，并通过自助法探索性图分析估计其潜在维度。",
+          "validation": "ネットワークがリズム、メロディ、オーディオ、構成、構造、歌詞という6つの安定した品質次元の分類群へと収束することが示されている。",
+          "validationEn": "Shows that the network converges onto a taxonomy of six stable quality dimensions: Rhythm, Melody, Audio, Composition, Structure, and Lyrics.",
+          "validationZh": "表明网络收敛于六个稳定质量维度的分类法：节奏、旋律、音频、构图、结构和歌词。",
+          "discussion": "音楽生成モデルを評価するためのユーザー調査を実施するための統一された方法論を提示している。",
+          "discussionEn": "Points to a unified methodology for conducting user studies to evaluate music generation models.",
+          "discussionZh": "指出了开展用户研究以评估音乐生成模型的统一方法论。",
+          "abstractJa": "主観的ユーザー調査は音楽生成モデルを評価する主要な手法の一つであるが、評価プロトコルは多岐にわたり再現性が乏しい。本論文では、2020年から2025年のISMIR音楽生成論文における主観的評価方法をマッピングし、生成的精神測定学を適用して項目の安定性を評価する。論文の記述からLLMと手動検証を用いて284項目を抽出し標準化した。これらをコンテキスト埋め込みとして表現し、ユニーク変数分析とブートストラップ探索的グラフ分析を適用した。結果として、ネットワークはリズム、メロディ、オーディオ、構成、構造、歌詞という6つの安定した品質次元の分類群に収束することが示された。",
+          "abstractZh": "主观用户研究是评估音乐生成 models 的主要方法之一。然而，主观评估协议差异很大，很少有足够的细节来重现。在本文中，我们梳理了2020-2025年ISMIR音乐生成论文中的主观评估方法，并应用生成心理测学来评估其项目的稳定性。我们利用大语言模型和人工验证从论文的方法论描述中提取了284个项目并进行了标准化。将这些项目表示为上下文嵌入，并应用唯一变量分析去除冗余、局部相关的项目，利用自助法探索性图分析估计其潜在维度。结果表明，网络收敛于六个稳定质量维度的分类法：节奏、旋律、音频、构图、结构和歌词，指向了评估音乐生成模型的统一方法论。",
+          "nextReads": [
+            {
+              "label": "Jukebox: A Generative Model for Music (2020)",
+              "arxivId": "2005.00341",
+              "url": "https://arxiv.org/abs/2005.00341",
+              "verified": true,
+              "source": "arxiv_api"
+            }
+          ],
+          "citationCount": null,
+          "githubRepo": null,
+          "upvotes": null,
+          "projectPage": null
+        },
+        {
+          "id": "2611.17644v1",
+          "date": "Nov 13",
+          "title": "CoTTAGE: An Explainable Judge for Text-to-Audio Generation",
+          "titleJa": "CoTTAGE：テキスト・音声生成のための説明可能な評価器",
+          "titleZh": "CoTTAGE：文本到音频生成的可解释评估器",
+          "authors": [
+            "Yu-Xiang Lin",
+            "Yun-Man Hsu",
+            "Bo-Ru Lu",
+            "Kuan-Po Huang",
+            "Wenze Ren"
+          ],
+          "org": "",
+          "orgSource": null,
+          "abstract": "Rapid progress in text-to-audio (TTA) generation demands reliable and explainable automatic evaluation. However, existing metrics fail to simultaneously deliver high correlation with human judgments and meaningful, audio-grounded explanations, forcing reliance on labor-intensive human evaluation that bottlenecks model development iteration. To address this, we propose CoTTAGE, a reasoning-based evaluator for text relevance (REL) and audio quality (OVL). Following a reason-then-predict paradigm, CoTTAGE first generates an audio-grounded rationale to diagnose errors before predicting scores. Supported by over 10K newly collected human OVL annotations, CoTTAGE is first trained via supervised fine-tuning and then refined with reinforcement learning using a Thurstone-based preference objective that converts sampled score distributions into pairwise preference probabilities and rewards agreement with rankings derived from human judgments. Across six benchmarks spanning REL and OVL, CoTTAGE achieves state-of-the-art correlation with human judgments while producing human-preferred explanations to accelerate TTA development.",
+          "comment": null,
+          "journalRef": null,
+          "categories": [
+            "cs.SD",
+            "cs.AI"
+          ],
+          "url": "https://arxiv.org/abs/2611.17644v1",
+          "category": "generation",
+          "task": "音声評価",
+          "taskEn": "Audio evaluation",
+          "taskZh": "音频评估",
+          "proposedMethod": "CoTTAGE",
+          "datasets": [],
+          "what": "テキスト・音声生成（TTA）モデルのテキスト関連性と音声品質を評価するための、推論ベースの説明可能な評価器「CoTTAGE」を提案する。",
+          "whatEn": "Proposes CoTTAGE, a reasoning-based explainable evaluator for text relevance and audio quality in text-to-audio generation.",
+          "novel": "著者らは、スコアを予測する前にエラーを診断する音声根拠の根拠を生成する「理由を述べてから予測する（reason-then-predict）」パラダイムを採用し、サンプリングされたスコア分布をペアワイズ選好確率に変換するサーストン型選好目的関数で強化学習を行ったことを主張している。",
+          "novelEn": "The authors claim novelty in following a reason-then-predict paradigm that generates an audio-grounded rationale to diagnose errors before predicting scores, refined with reinforcement learning using a Thurstone-based preference objective.",
+          "novelZh": "作者声称其创新之处在于遵循“先推理后预测”范式，在预测分数之前生成基于音频依据的理由来诊断错误，并使用基于Thurstone的偏好目标通过强化学习进行精炼。",
+          "method": "収集された人間のOVLアノテーションを用いた教師あり微調整の後、サーストン型選好目的関数を用いる強化学習によって洗練される。",
+          "methodEn": "Trained via supervised fine-tuning using collected human OVL annotations and then refined with reinforcement learning using a Thurstone-based preference objective.",
+          "methodZh": "使用收集的人工OVL标注通过监督微调进行训练，然后使用基于Thurstone的偏好目标通过强化学习进行精炼。",
+          "validation": "テキスト関連性と音声品質にわたる6つのベンチマークにおいて、人間の判断と最先端の相関を達成し、人間が好む説明を生成することが示されている。",
+          "validationEn": "Achieves state-of-the-art correlation with human judgments across six benchmarks spanning text relevance and audio quality while producing human-preferred explanations.",
+          "validationZh": "在跨越文本相关性和音频质量的六个基准测试中，实现了与人类判断的最先进相关性，同时生成人类偏好的解释。",
+          "discussion": "信頼性が高く説明可能な自動評価を通じて、モデル開発の反復を加速する可能性を示している。",
+          "discussionEn": "Demonstrates potential to accelerate model development iteration through reliable and explainable automatic evaluation.",
+          "discussionZh": "展示了通过可靠且可解释的自动评估来加速模型开发迭代的潜力。",
+          "abstractJa": "テキスト・音声生成（TTA）の急速な進展には、信頼性が高く説明可能な自動評価が求められている。しかし、既存の指標は人間との相関や音声に基づいた説明を十分に提供できず、手作業による評価に依存せざるを得ない。この課題に対し、テキスト関連性と音声品質のための推論ベースの評価器「CoTTAGE」を提案する。理由を述べてから予測するパラダイムに従い、エラーを診断する根拠を生成してからスコアを予測する。1万件を超える人間のアノテーションを用いて教師あり微調整を行い、サーストン型選好目的関数を用いた強化学習で洗練させた。6つのベンチマークにおいて、人間の判断と最先端の相関を達成した。",
+          "abstractZh": "文本到音频（TTA）生成的快速进展需要可靠且可解释的自动评估。然而，现有指标无法同时提供与人类判断的高相关性以及有意义的、基于音频的解释，迫使人们依赖耗费大量人工的评估。为了解决这个问题，我们提出了CoTTAGE，一个用于文本相关性和音频质量的基于推理的评估器。遵循“先推理后预测”的范式，CoTTAGE在预测分数之前首先生成基于音频依据的理由来诊断错误。在超过10K个新收集的人工OVL标注支持下，CoTTAGE首先通过监督微调进行训练，然后使用基于Thurstone的偏好目标通过强化学习进行精炼。在跨越文本相关性和音频质量的六个基准测试中，CoTTAGE实现了与人类判断的最先进相关性，同时产生了人类偏好的解释。",
+          "nextReads": [
+            {
+              "label": "AudioLDM: Text-to-Audio Generation with Latent Diffusion Models (2023)",
+              "arxivId": "2301.12503",
+              "url": "https://arxiv.org/abs/2301.12503",
+              "verified": true,
+              "source": "arxiv_api"
+            },
+            {
+              "label": "Make-An-Audio: Text-To-Audio Generation with Prompt-Enhanced Diffusion Models (2023)",
+              "arxivId": "2301.12661",
+              "url": "https://arxiv.org/abs/2301.12661",
+              "verified": true,
+              "source": "arxiv_api"
+            }
+          ],
+          "citationCount": null,
+          "githubRepo": null,
+          "upvotes": null,
+          "projectPage": null
+        }
+      ]
+    },
+    {
+      "id": "codec",
+      "label": "音声コーデック",
+      "labelEn": "Audio Codec",
+      "labelZh": "音频编解码",
+      "color": "#fb923c",
+      "papers": [
+        {
+          "id": "2611.25503v1",
+          "date": "Nov 19",
+          "title": "Joint Language Modeling for In-the-Wild Speech-Scene Generation with Distinct Token Representations",
+          "titleJa": "異なるトークン表現を用いたインザワイルド音声シーン生成のための結合言語モデリング",
+          "titleZh": "使用不同token表示的野外语音场景生成联合语言建模",
+          "authors": [
+            "Semin Kim",
+            "Ju Yeon Kang",
+            "Sunghwan Ahn",
+            "Seonuk Kim",
+            "Nam Soo Kim"
+          ],
+          "org": "",
+          "orgSource": null,
+          "abstract": "Speech-scene generation aims to synthesize intelligible target speech together with diverse environmental sounds as a coherent acoustic scene. The task is considered challenging in two respects. Speech and environmental audio differ substantially in their semantic and acoustic characteristics, yet existing approaches typically model the complete scene using a single mixed acoustic representation. At the same time, the two sounds are closely related in real-world speech scenes, whereas conventional approaches usually rely on simulated scenes mixed from independently recorded sources. We propose a large language model (LLM)-based framework for joint modeling of distinct speech and environment token streams. A source-aware neural audio codec extracts temporally aligned speech and environment tokens from mixed audio, and a pretrained LLM generates both token streams in an interleaved fashion conditioned on the natural-language scene description and speech content. This formulation preserves source-specific representations while modeling the token streams within a shared generative context. Since both streams are extracted directly from mixed recordings, the model can also be adapted to in-the-wild speech scenes without isolated sources. Our experimental results demonstrate that the proposed framework improves speech intelligibility, scene relevance, and audio quality over existing speech-scene generation techniques, with consistent gains from real-world adaptation. We further investigate the effects of distinct token representations and interleaved generation, and analyze whether the environmental sound remains stable while speech is active and how the two streams interact.",
+          "comment": null,
+          "journalRef": null,
+          "categories": [
+            "eess.AS",
+            "cs.AI",
+            "cs.LG"
+          ],
+          "url": "https://arxiv.org/abs/2611.25503v1",
+          "category": "codec",
+          "task": "音声生成",
+          "taskEn": "Speech generation",
+          "taskZh": "音频生成",
+          "proposedMethod": "LLMベースのフレームワーク",
+          "datasets": [],
+          "what": "大規模言語モデルを使用して、理解しやすいターゲット音声と多様な環境音をコヒーレントな音響シーンとして共同で合成するフレームワークを提案する。",
+          "whatEn": "Proposes a large language model-based framework to jointly synthesize intelligible target speech and diverse environmental sounds as a coherent acoustic scene.",
+          "whatZh": "提出了一个基于大语言模型的框架，用于联合合成清晰的目标语音和多样化的环境声作为连贯的声学场景。",
+          "novel": "著者らは、ソースアウェアなニューラル音声コーデックを用いて混ざった音声から区別された音声と環境音のトークンストリームを抽出し、共有された生成コンテキスト内でLLMを用いてインターリーブ方式でモデル化することを主張している。",
+          "novelEn": "The authors claim novelty in using a source-aware neural audio codec to extract distinct speech and environment token streams from mixed audio and modeling them in a shared generative context with an LLM in an interleaved fashion.",
+          "novelZh": "作者声称其创新之处在于使用具有源感知能力的神经音频编解码器从混合音频中提取不同的语音和环境声token流，并在共享的生成上下文中通过大语言模型以交错方式对其进行建模。",
+          "method": "混雑した音声からニューラル音声コーデックにより時間的に整合した音声および環境音のトークンを抽出し、自然言語のシーン記述と音声内容を条件としてLLMが両方のトークンストリームを生成する。",
+          "methodEn": "Extracts temporally aligned speech and environment tokens from mixed audio using a neural audio codec, and generates both token streams in an interleaved fashion using an LLM conditioned on scene description and speech content.",
+          "methodZh": "使用神经音频编解码器从混合音频中提取时间对齐的语音和环境声token，然后利用大语言模型在场景描述和语音内容的条件下以交错方式生成这两个token流。",
+          "validation": "実験結果により、提案手法が既存の音声シーン生成技術と比較して、音声の明瞭度、シーンの関連性、および音声品質を向上させ、実世界の適応から一貫した利得を得ることが示されている。",
+          "validationEn": "Experimental results demonstrate that the proposed framework improves speech intelligibility, scene relevance, and audio quality over existing techniques, with consistent gains from real-world adaptation.",
+          "validationZh": "实验结果表明，与现有技术相比，所提出的框架提高了语音清晰度、场景相关性以及音频质量，并且通过真实世界适应获得了持续的性能提升。",
+          "discussion": "異なるトークン表現とインターリーブ生成の効果を調査し、音声アクティブ時に環境音が安定しているかどうかや2つのストリームの相互作用を分析している。",
+          "discussionEn": "Investigates the effects of distinct token representations and interleaved generation, and analyzes whether the environmental sound remains stable while speech is active and how the two streams interact.",
+          "discussionZh": "研究了不同token表示和交错生成的效果，并分析了在语音活跃时环境声是否保持稳定以及两个流如何交互。",
+          "abstractJa": "音声シーン生成は、理解しやすいターゲット音声と多様な環境音をコヒーレントな音響シーンとして合成することを目的とする。本タスクは、音声と環境音が意味的・音響的特性において大きく異なるにもかかわらず、既存手法が単一の混合音響表現を用いてモデル化しがちである点などで困難視されている。本研究では、異なる音声および環境音のトークンストリームを共同でモデル化するための大規模言語モデル（LLM）ベースのフレームワークを提案する。ソースアウェアなニューラル音声コーデックが混ざった音声から時間的に整合した音声・環境音トークンを抽出し、事前学習済みLLMが自然言語のシーン記述と音声内容を条件に両方のストリームをインターリーブ方式で生成する。実験結果は、提案フレームワークが既存技術に比べて音声明瞭度、シーン関連性、音声品質を向上させることを示している。",
+          "abstractZh": "语音场景生成旨在将清晰的目标语音与多样化的环境声合成为连贯的声学场景。该任务在两个方面被认为具有挑战性。语音和环境音频在语义和声学特征上有很大差异，但现有方法通常使用单一的混合声学表现来对整个场景进行建模。为此，我们提出了一个基于大语言模型（LLM）的框架，用于联合建模不同的语音和环境token流。源感知的神经音频编解码器从混合音频中提取时间对齐的语音和环境token，预训练的LLM在自然语言场景描述和语音内容的条件下以交错方式生成这两个token流。我们的实验结果表明，与现有的语音场景生成技术相比，所提出的框架提高了语音清晰度、场景相关性和音频质量。",
+          "nextReads": [
+            {
+              "label": "SoundStorm: Efficient Parallel Audio Generation (2023)",
+              "arxivId": "2305.09636",
+              "url": "https://arxiv.org/abs/2305.09636",
+              "verified": true,
+              "source": "arxiv_api"
+            }
+          ],
+          "citationCount": null,
+          "githubRepo": null,
+          "upvotes": null,
+          "projectPage": null
+        }
+      ]
+    }
+  ],
+  "trend": [
+    "統合言語モデルによる音声シーン生成や高忠実度なBiVoC音声ボコーダの研究が進展している",
+    "音楽生成の心理測定評価やCoTTAGEを用いたテキスト音声生成の説明可能な評価手法が提案されている",
+    "AudioTraceによる音声の大規模言語モデル向け会員資格推論や著作権保護の技術が注目されている"
+  ],
+  "trendEn": [
+    "Research on joint speech scene generation models and the high fidelity BiVoC neural vocoder is advancing rapidly",
+    "Generative psychometrics for music generation and the CoTTAGE explainable evaluator are introduced for better assessment",
+    "AudioTrace is proposed for file level membership inference and copyright protection in audio large language models"
+  ],
+  "trendZh": [
+    "联合语言模型的语音场景生成以及高保真BiVoC神经声码器研究正在取得进展",
+    "音乐生成的生成心理测验评估与基于CoTTAGE的可解释文本转音频评测方法被相继提出",
+    "旨在保护隐私和版权的音频大语言模型成员推断方法AudioTrace受到关注"
+  ]
+}
